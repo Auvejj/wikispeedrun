@@ -300,6 +300,29 @@ input:focus-visible {
   color: #a8b5a8;
 }
 
+.room-status.form-error {
+  color: #a8b5a8;
+}
+
+.room-route-editor {
+  display: grid;
+  gap: 9px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.room-route-editor .field-label:not(:first-child) {
+  margin-top: 3px;
+}
+
+.room-route-editor .language-row {
+  margin: 5px 0;
+}
+
+.room-route-editor .form-error {
+  min-height: 0;
+}
+
 .room-card .start-button:disabled {
   cursor: not-allowed;
   opacity: 0.42;
@@ -601,6 +624,8 @@ input:focus-visible {
 }
 
 .timer {
+  position: relative;
+  z-index: 1;
   color: var(--green);
   text-shadow: 0 0 24px rgba(194, 251, 98, 0.13);
 }
@@ -831,6 +856,29 @@ input:focus-visible {
 
   .hud {
     gap: 7px;
+  }
+
+  .timer-card {
+    display: flex;
+    min-width: 0;
+    min-height: 108px;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .timer-card::after {
+    display: none;
+  }
+
+  .timer {
+    font-size: clamp(27px, 8.5vw, 39px);
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  .timer-foot {
+    white-space: nowrap;
   }
 
   .timer-card,
