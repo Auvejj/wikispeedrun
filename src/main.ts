@@ -33,19 +33,19 @@ function renderSetup() {
       <section class="hero">
         <div class="hero-copy"><p class="eyebrow"><span>01</span> WIKIPEDIE, ALE JAKO ZÁVOD</p><h1>Jak rychle<br>najdeš <em>cestu?</em></h1><p class="intro">Začni na jednom článku. Skonči na druhém. Mezitím se můžeš pohybovat jen po odkazech.</p></div>
         <div class="route-card">
-          <div class="card-top"><span class="card-label">NASTAV SI TRASU</span><span class="route-icon">↗</span></div>
+          <div class="card-top"><span class="card-label">NASTAV SI TRASU</span><span class="route-icon">01</span></div>
           <label class="field-label" for="start-input">STARTOVNÍ ČLÁNEK</label>
-          <div class="input-wrap"><span class="field-symbol">↗</span><input id="start-input" autocomplete="off" placeholder="např. Praha" value="Praha"></div>
+          <div class="input-wrap"><span class="field-symbol">◉</span><input id="start-input" autocomplete="off" placeholder="např. Praha" required aria-required="true"></div>
           <div class="route-connector"><span></span><small>TVÁ CESTA</small><span></span></div>
           <label class="field-label" for="target-input">CÍLOVÝ ČLÁNEK</label>
-          <div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="target-input" autocomplete="off" placeholder="např. Měsíc" value="Měsíc"></div>
+          <div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="target-input" autocomplete="off" placeholder="např. Měsíc" required aria-required="true"></div>
           <div class="language-row"><span>JAZYK WIKIPEDIE</span><div class="language-switch"><button class="lang-choice active" data-lang="cs">ČEŠTINA</button><button class="lang-choice" data-lang="en">ENGLISH</button></div></div>
-          <button class="start-button" id="start-game"><span>VYRAZIT NA CESTU</span><b>→</b></button>
+          <button class="start-button" id="start-game"><span>VYRAZIT NA CESTU</span></button>
           <p class="microcopy">Bez vyhledávání během hry. Jen ty a odkazy.</p>
           <p class="form-error" id="form-error" aria-live="polite"></p>
         </div>
       </section>
-      <section class="how-row"><div><span class="how-num">01</span><strong>Vyber si trasu</strong><small>Zadej dva články Wikipedie.</small></div><div><span class="how-num">02</span><strong>Proklikávej se</strong><small>Každý odkaz je další krok.</small></div><div><span class="how-num">03</span><strong>Doraz do cíle</strong><small>Sleduj čas i počet kliknutí.</small></div><div class="how-aside">WIKIPEDIE JE VĚTŠÍ,<br>NEŽ SI MYSLÍŠ. <span>↗</span></div></section>
+      <section class="how-row"><div><span class="how-num">01</span><strong>Vyber si trasu</strong><small>Zadej dva články Wikipedie.</small></div><div><span class="how-num">02</span><strong>Proklikávej se</strong><small>Každý odkaz je další krok.</small></div><div><span class="how-num">03</span><strong>Doraz do cíle</strong><small>Sleduj čas i počet kliknutí.</small></div><div class="how-aside">WIKIPEDIE JE VĚTŠÍ,<br>NEŽ SI MYSLÍŠ.</div></section>
       <footer class="site-footer"><span>© WIKI SPRINT</span><span>POSTAVENO ZVĚDAVOSTÍ <b>✳</b></span></footer>
     </main>`;
   const startInput = app.querySelector<HTMLInputElement>('#start-input')!;
@@ -80,16 +80,15 @@ function formatTime(seconds: number) {
 function renderGame() {
   app.innerHTML = `
     <main class="game-shell">
-      <header class="game-topbar"><button class="back-button" id="quit-game" aria-label="Zpět">←</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><div class="game-status"><i></i> PROBÍHÁ HRA</div><button class="give-up" id="give-up">VZDÁT TO <span>↗</span></button></header>
+      <header class="game-topbar"><button class="back-button" id="quit-game">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><div class="game-status"><i></i> PROBÍHÁ HRA</div><button class="give-up" id="give-up">VZDÁT TO</button></header>
       <div class="game-layout">
-        <section class="wiki-panel"><div class="browser-bar"><span class="browser-dots"><i></i><i></i><i></i></span><div class="browser-address"><span>⌕</span><span class="address-text">cs.wikipedia.org/wiki/${escapeHtml(startTitle.replaceAll(' ', '_'))}</span><button id="open-original" title="Otevřít originál">↗</button></div><button class="reload-article" id="reload-article" title="Obnovit článek">↻</button></div><div id="article-content" class="article-content"><div class="article-loading"><span class="loader"></span><p>NAČÍTÁM WIKIPEDII…</p></div></div></section>
+        <section class="wiki-panel"><div class="browser-bar"><span class="browser-dots"><i></i><i></i><i></i></span><div class="browser-address"><span>⌕</span><span class="address-text">cs.wikipedia.org/wiki/${escapeHtml(startTitle.replaceAll(' ', '_'))}</span><button id="open-original" title="Otevřít originál">Otevřít</button></div><button class="reload-article" id="reload-article" title="Obnovit článek">Obnovit</button></div><div id="article-content" class="article-content"><div class="article-loading"><span class="loader"></span><p>NAČÍTÁM WIKIPEDII…</p></div></div></section>
         <aside class="hud"><div class="hud-heading"><span>TVŮJ ZÁVOD</span><span class="hud-live"><i></i> LIVE</span></div>
           <div class="timer-card"><div class="timer-label">UPLYNULÝ ČAS</div><div id="timer" class="timer">00:00</div><div class="timer-foot"><span class="pulse-dot"></span> ČAS BĚŽÍ</div></div>
-          <div class="goal-card"><span class="goal-kicker">DOSTAŇ SE NA ČLÁNEK</span><div class="goal-title" id="goal-title">${escapeHtml(targetTitle)}</div><a id="goal-link" href="${wikiUrl(targetTitle)}" target="_blank" rel="noreferrer">ZOBRAZIT ČLÁNEK <span>↗</span></a></div>
-          <div class="stats-row"><div class="stat-card"><span>PROKLIKNUTÍ</span><strong id="click-count">00</strong></div><div class="stat-card"><span>ČLÁNKY</span><strong id="article-count">01</strong></div></div>
-          <div class="route-card-small"><div class="route-small-title">TVOJE TRASA <span>↗</span></div><ol id="route-list"><li><i class="route-dot start-dot"></i><span class="route-item">${escapeHtml(startTitle)}</span><b>START</b></li></ol></div>
-          <div class="tip-card"><span>✳</span><p><b>TIP NA CESTU</b><br>Hledej v článku souvislosti. Odkaz, který potřebuješ, může být blíž, než čekáš.</p></div>
-          <button class="new-game" id="new-game">NOVÁ HRA <span>↗</span></button>
+          <div class="goal-card"><span class="goal-kicker">DOSTAŇ SE NA ČLÁNEK</span><div class="goal-title" id="goal-title">${escapeHtml(targetTitle)}</div><a id="goal-link" href="${wikiUrl(targetTitle)}" target="_blank" rel="noreferrer">ZOBRAZIT ČLÁNEK</a></div>
+          <div class="stats-row"><div class="stat-card"><span>PROKLIKNUTÍ</span><strong id="click-count">00</strong></div></div>
+          <div class="route-card-small"><div class="route-small-title">TVOJE TRASA</div><ol id="route-list"><li><i class="route-dot start-dot"></i><span class="route-item">${escapeHtml(startTitle)}</span><b>START</b></li></ol></div>
+          <button class="new-game" id="new-game">NOVÁ HRA</button>
         </aside>
       </div>
       <footer class="game-footer"><span>WIKI SPRINT <b>✳</b></span><span>ČLÁNKY POSKYTUJE WIKIPEDIE</span><span id="current-language">${language === 'cs' ? 'ČESKÁ' : 'ANGLICKÁ'} VERZE</span></footer>
@@ -138,7 +137,7 @@ async function loadArticle(title: string, isClick: boolean) {
     updateHud();
     if (parsed.title.toLocaleLowerCase() === targetTitle.toLocaleLowerCase()) showResult(true);
   } catch (error) {
-    content.innerHTML = `<div class="article-error"><span>!</span><h2>Článek se nenačetl</h2><p>${escapeHtml(error instanceof Error ? error.message : 'Zkus to prosím znovu.')}</p><button id="retry-load">ZKUSIT ZNOVU ↻</button></div>`;
+    content.innerHTML = `<div class="article-error"><span>!</span><h2>Článek se nenačetl</h2><p>${escapeHtml(error instanceof Error ? error.message : 'Zkus to prosím znovu.')}</p><button id="retry-load">ZKUSIT ZNOVU</button></div>`;
     content.querySelector('#retry-load')?.addEventListener('click', () => void loadArticle(title, isClick));
   } finally { loading = false; }
 }
@@ -152,10 +151,8 @@ async function navigateToArticle(title: string) {
 
 function updateHud() {
   const clickCount = app.querySelector<HTMLElement>('#click-count');
-  const articleCount = app.querySelector<HTMLElement>('#article-count');
   const routeList = app.querySelector<HTMLOListElement>('#route-list');
   if (clickCount) clickCount.textContent = clicks.toString().padStart(2, '0');
-  if (articleCount) articleCount.textContent = route.length.toString().padStart(2, '0');
   if (routeList) routeList.innerHTML = route.map((title, index) => `<li><i class="route-dot ${index === 0 ? 'start-dot' : ''}"></i><span class="route-item">${escapeHtml(title)}</span>${index === 0 ? '<b>START</b>' : ''}</li>`).join('');
   const target = app.querySelector<HTMLElement>('#goal-title');
   if (target) target.textContent = targetTitle;
@@ -167,7 +164,7 @@ function showResult(won: boolean) {
   const overlay = app.querySelector<HTMLDivElement>('#result-overlay');
   if (!overlay) return;
   overlay.classList.remove('hidden');
-  overlay.innerHTML = `<div class="result-card"><button id="close-result" class="result-close" aria-label="Zavřít">×</button><div class="result-symbol">${won ? '✳' : '↗'}</div><p class="eyebrow">${won ? 'CÍL DORUČEN' : 'KAŽDÁ CESTA NĚCO NAUČÍ'}</p><h2>${won ? 'To byla jízda.' : 'Závod ukončen.'}</h2><p class="result-copy">${won ? `Dostal/a ses z článku <b>${escapeHtml(startTitle)}</b> až na <b>${escapeHtml(targetTitle)}</b>.` : `Tvůj cíl byl článek <b>${escapeHtml(targetTitle)}</b>. Zkus trasu znovu a najdi jinou cestu.`}</p><div class="result-stats"><div><span>ČAS</span><strong>${elapsed}</strong></div><div><span>KLIKNUTÍ</span><strong>${clicks.toString().padStart(2, '0')}</strong></div></div><button class="start-button" id="result-new-game"><span>JEŠTĚ JEDEN ZÁVOD</span><b>→</b></button><button class="text-button" id="result-home">ZMĚNIT TRASU</button></div>`;
+  overlay.innerHTML = `<div class="result-card"><button id="close-result" class="result-close" aria-label="Zavřít">×</button><div class="result-symbol">✳</div><p class="eyebrow">${won ? 'CÍL DORUČEN' : 'KAŽDÁ CESTA NĚCO NAUČÍ'}</p><h2>${won ? 'To byla jízda.' : 'Závod ukončen.'}</h2><p class="result-copy">${won ? `Dostal/a ses z článku <b>${escapeHtml(startTitle)}</b> až na <b>${escapeHtml(targetTitle)}</b>.` : `Tvůj cíl byl článek <b>${escapeHtml(targetTitle)}</b>. Zkus trasu znovu a najdi jinou cestu.`}</p><div class="result-stats"><div><span>ČAS</span><strong>${elapsed}</strong></div><div><span>KLIKNUTÍ</span><strong>${clicks.toString().padStart(2, '0')}</strong></div></div><button class="start-button" id="result-new-game"><span>JEŠTĚ JEDEN ZÁVOD</span></button><button class="text-button" id="result-home">ZMĚNIT TRASU</button></div>`;
   overlay.querySelector('#close-result')!.addEventListener('click', () => overlay.classList.add('hidden'));
   overlay.querySelector('#result-new-game')!.addEventListener('click', () => { overlay.classList.add('hidden'); startedAt = Date.now(); clicks = 0; route = [startTitle]; renderGame(); void loadArticle(startTitle, false); });
   overlay.querySelector('#result-home')!.addEventListener('click', goHome);
@@ -177,7 +174,7 @@ function confirmExit() {
   if (clicks === 0 && !currentTitle) { goHome(); return; }
   const overlay = app.querySelector<HTMLDivElement>('#result-overlay')!;
   overlay.classList.remove('hidden');
-  overlay.innerHTML = `<div class="result-card confirm-card"><button id="close-result" class="result-close" aria-label="Zavřít">×</button><div class="result-symbol">↗</div><p class="eyebrow">OPUSTIT ZÁVOD?</p><h2>Už teď končíš?</h2><p class="result-copy">Dosavadní čas a trasa se po opuštění smažou.</p><button class="start-button" id="confirm-home"><span>OPUSTIT HRU</span><b>→</b></button><button class="text-button" id="keep-playing">POKRAČOVAT VE HŘE</button></div>`;
+  overlay.innerHTML = `<div class="result-card confirm-card"><button id="close-result" class="result-close" aria-label="Zavřít">×</button><div class="result-symbol">✳</div><p class="eyebrow">OPUSTIT ZÁVOD?</p><h2>Už teď končíš?</h2><p class="result-copy">Dosavadní čas a trasa se po opuštění smažou.</p><button class="start-button" id="confirm-home"><span>OPUSTIT HRU</span></button><button class="text-button" id="keep-playing">POKRAČOVAT VE HŘE</button></div>`;
   overlay.querySelector('#close-result')!.addEventListener('click', () => overlay.classList.add('hidden'));
   overlay.querySelector('#keep-playing')!.addEventListener('click', () => overlay.classList.add('hidden'));
   overlay.querySelector('#confirm-home')!.addEventListener('click', goHome);

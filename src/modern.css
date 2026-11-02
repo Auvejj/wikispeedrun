@@ -25,6 +25,7 @@ body::before {
 
 button {
   -webkit-tap-highlight-color: transparent;
+  text-align: center;
 }
 
 button:focus-visible,
@@ -183,6 +184,7 @@ input:focus-visible {
 .start-button {
   height: 54px;
   border-radius: 9px;
+  justify-content: center;
   color: #172012;
   font-weight: 500;
   box-shadow: 0 7px 24px rgba(194, 251, 98, 0.1);
@@ -247,8 +249,13 @@ input:focus-visible {
 }
 
 .back-button {
+  width: auto;
+  min-width: 52px;
+  padding: 0 9px;
   border: 1px solid transparent;
   border-radius: 9px;
+  font: 8px var(--mono);
+  letter-spacing: 0.08em;
   transition: background 160ms ease, border-color 160ms ease;
 }
 
@@ -294,11 +301,27 @@ input:focus-visible {
   border-radius: 6px;
 }
 
+.browser-address button,
 .reload-article {
-  width: 27px;
+  flex: none;
+  width: auto;
   height: 27px;
-  border-radius: 7px;
+  padding: 0 7px;
+  border-radius: 5px;
+  color: #646d65;
+  font: 7px var(--mono);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
   transition: background 160ms ease;
+}
+
+.browser-address button {
+  margin-left: auto;
+}
+
+.browser-address .address-text {
+  flex: 1;
+  text-align: center;
 }
 
 .reload-article:hover,
@@ -363,10 +386,29 @@ input:focus-visible {
 .goal-card > a {
   border-color: rgba(222, 235, 223, 0.1);
   color: var(--green);
+  justify-content: center;
 }
 
 .stat-card {
-  padding: 11px 13px;
+  min-height: 112px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.stats-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.stat-card > span {
+  font-size: 8px;
+}
+
+.stat-card strong {
+  font-size: 40px;
+  line-height: 1.12;
 }
 
 .route-card-small {
@@ -391,22 +433,8 @@ input:focus-visible {
   background: var(--green);
 }
 
-.tip-card {
-  border: 1px solid rgba(194, 251, 98, 0.13);
-  border-radius: 10px;
-  background: rgba(194, 251, 98, 0.08);
-  color: #c4d1b8;
-}
-
-.tip-card > span {
-  color: var(--green);
-}
-
-.tip-card b {
-  color: #d4e4c0;
-}
-
 .new-game {
+  justify-content: center;
   border-color: rgba(222, 235, 223, 0.15);
   border-radius: 8px;
   color: #c4cec5;
@@ -425,6 +453,11 @@ input:focus-visible {
 
 .article-error > span {
   background: #eef4e6;
+}
+
+.article-error button {
+  min-width: 150px;
+  border-radius: 8px;
 }
 
 .result-overlay {
@@ -568,7 +601,6 @@ input:focus-visible {
   .goal-card,
   .stats-row,
   .route-card-small,
-  .tip-card,
   .new-game {
     animation: enter-soft 420ms ease both;
   }
