@@ -13,3 +13,7 @@ Projekt je nastavený pro GitHub repozitář s názvem `wikispeedrun`.
 5. Hra bude dostupná na `https://Auvejj.github.io/wikispeedrun/`.
 
 Každá další změna nahraná do větve `main` se automaticky znovu publikuje.
+
+## Online multiplayer
+
+Online místnosti používají PeerJS pro navázání spojení mezi prohlížeči. Signál pro spojení zajišťuje výchozí PeerJS Cloud; samotná herní data pak putují mezi hráči přes WebRTC. Pro malé hry není potřeba vytvářet vlastní server ani zadávat API klíče. Dostupnost spojení závisí na PeerJS Cloud a síťových podmínkách hráčů.

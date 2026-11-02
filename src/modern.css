@@ -86,6 +86,233 @@ input:focus-visible {
   padding-bottom: clamp(76px, 10vh, 120px);
 }
 
+.welcome-shell .hero {
+  min-height: min(690px, calc(100vh - 210px));
+}
+
+.welcome-shell .how-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.welcome-back {
+  flex: none;
+}
+
+.welcome-card .mode-heading {
+  margin: 20px 0 10px;
+}
+
+.mode-buttons {
+  display: grid;
+  gap: 10px;
+}
+
+.mode-button {
+  width: 100%;
+  min-height: 50px;
+  justify-content: center;
+  border-radius: 9px;
+  font: 500 10px var(--mono);
+  letter-spacing: 0.09em;
+}
+
+.mode-button-secondary {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(222, 235, 223, 0.18);
+  background: rgba(255, 255, 255, 0.025);
+  color: #e6ece5;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.mode-button-secondary:hover {
+  transform: translateY(-1px);
+  border-color: rgba(194, 251, 98, 0.55);
+  background: rgba(194, 251, 98, 0.07);
+}
+
+.multiplayer-card {
+  display: grid;
+  gap: 14px;
+}
+
+.multiplayer-card .card-top {
+  margin-bottom: 5px;
+}
+
+.multiplayer-card .microcopy {
+  line-height: 1.6;
+}
+
+.multiplayer-card .language-row {
+  margin: 8px 0 4px;
+}
+
+.room-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 3px 0;
+  color: #77847a;
+  font: 8px var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.room-divider::before,
+.room-divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+  content: '';
+}
+
+.room-code-symbol {
+  font: 15px var(--mono);
+}
+
+.multiplayer-card > .mode-button-secondary {
+  min-height: 46px;
+}
+
+.room-shell .room-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(390px, 480px);
+}
+
+.room-card {
+  gap: 11px;
+}
+
+.room-card .card-top {
+  margin-bottom: 3px;
+}
+
+.room-code-display {
+  padding: 12px 10px 15px;
+  border-bottom: 1px solid var(--line);
+  color: var(--green);
+  font: 600 clamp(25px, 4vw, 38px) var(--mono);
+  letter-spacing: 0.1em;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.copy-room-code {
+  width: 100%;
+  min-height: 43px;
+}
+
+.room-route {
+  display: grid;
+  gap: 5px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.room-route > span,
+.room-route > small,
+.room-player-count {
+  color: #96a298;
+  font: 8px var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.room-route > strong {
+  color: #eff3ec;
+  font: 600 15px var(--display);
+  overflow-wrap: anywhere;
+}
+
+.room-players-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.room-player-list {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.room-player-list li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid rgba(222, 235, 223, 0.08);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.player-avatar {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(194, 251, 98, 0.13);
+  color: var(--green);
+  font: 10px var(--display);
+}
+
+.player-name {
+  overflow: hidden;
+  color: #e9eee7;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-state {
+  flex: none;
+  margin-left: auto;
+  color: #9eab9e;
+  font: 7px var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.room-status {
+  min-height: 14px;
+  margin: 0;
+  color: #a8b5a8;
+}
+
+.room-card .start-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  box-shadow: none;
+  transform: none;
+}
+
+.room-waiting {
+  padding: 15px 8px;
+  border: 1px solid rgba(222, 235, 223, 0.1);
+  border-radius: 8px;
+  color: #a8b5a8;
+  font: 8px var(--mono);
+  letter-spacing: 0.07em;
+  text-align: center;
+}
+
+.players-card {
+  min-height: 90px;
+  padding: 13px 15px;
+  overflow: hidden;
+  border: 1px solid rgba(222, 235, 223, 0.11);
+  border-radius: 11px;
+  background: rgba(30, 38, 33, 0.88);
+}
+
+.players-card .room-player-list {
+  max-height: 130px;
+  margin-top: 9px;
+  overflow-y: auto;
+}
+
 .hero h1 {
   color: #f4f6f1;
   font-size: clamp(72px, 8.5vw, 112px);
@@ -536,6 +763,22 @@ input:focus-visible {
     padding-bottom: 42px;
   }
 
+  .welcome-shell .hero {
+    min-height: auto;
+  }
+
+  .welcome-shell .how-row {
+    grid-template-columns: 1fr;
+  }
+
+  .room-shell .room-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .players-card {
+    grid-column: 1 / -1;
+  }
+
   .hero h1 {
     font-size: clamp(66px, 16vw, 82px);
     letter-spacing: -0.08em;
@@ -574,7 +817,8 @@ input:focus-visible {
   .timer-card,
   .goal-card,
   .stat-card,
-  .route-card-small {
+  .route-card-small,
+  .players-card {
     border-radius: 9px;
   }
 

@@ -1,7 +1,15 @@
 import './style.css';
 import './modern.css';
+import { Peer, type DataConnection } from 'peerjs';
 
 type WikiArticle = { title: string; html: string; url: string };
+type MultiplayerPlayer = { id: string; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number };
+type RoomPacket =
+  | { type: 'join'; name: string }
+  | { type: 'room'; startTitle: string; targetTitle: string; language: string; players: MultiplayerPlayer[]; started: boolean; startsAt: number }
+  | { type: 'start'; startTitle: string; targetTitle: string; language: string; countdownMs: number }
+  | { type: 'progress'; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number }
+  | { type: 'error'; message: string };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 let currentTitle = '';
@@ -13,6 +21,17 @@ let timerId: number | undefined;
 let language = 'cs';
 let route: string[] = [];
 let loading = false;
+let playerName = '';
+let isMultiplayer = false;
+let isRoomHost = false;
+let currentPeer: Peer | null = null;
+let hostConnection: DataConnection | null = null;
+let roomConnections = new Map<string, DataConnection>();
+let multiplayerPlayers = new Map<string, MultiplayerPlayer>();
+let roomCode = '';
+let roomStarted = false;
+let roomStartsAt = 0;
+let startTimeout: number | undefined;
 
 function wikiUrl(title: string) {
   return `https://${language}.wikipedia.org/wiki/${encodeURIComponent(title.replaceAll(' ', '_'))}`;
@@ -26,10 +45,320 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 }
 
-function renderSetup() {
+function renderWelcome() {
+  app.innerHTML = `
+    <main class="setup-shell welcome-shell">
+      <header class="topbar"><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> VYBER SI SVŮJ ZÁVOD</span></header>
+      <section class="hero welcome-hero">
+        <div class="hero-copy"><p class="eyebrow"><span>WIKI SPRINT</span> ZÁVOD ZAČÍNÁ TADY</p><h1>Každý klik<br>je <em>nový směr.</em></h1><p class="intro">Zadej přezdívku a vyber si, jestli se vydáš na cestu sám, nebo s ostatními.</p></div>
+        <div class="route-card welcome-card">
+          <div class="card-top"><span class="card-label">NEJDŘÍV SE PŘEDSTAV</span><span class="route-icon">01</span></div>
+          <label class="field-label" for="nickname-input">TVOJE PŘEZDÍVKA</label>
+          <div class="input-wrap"><span class="field-symbol">@</span><input id="nickname-input" autocomplete="nickname" maxlength="20" placeholder="např. Alex" required aria-required="true"></div>
+          <p class="form-error" id="nickname-error" aria-live="polite"></p>
+          <div class="mode-heading"><span class="card-label">JAK CHCEŠ HRÁT?</span></div>
+          <div class="mode-buttons"><button class="start-button mode-button" id="single-mode"><span>SINGLEPLAYER</span></button><button class="mode-button mode-button-secondary" id="multi-mode"><span>MULTIPLAYER</span></button></div>
+          <p class="microcopy">Přezdívku můžeš změnit při příštím závodě.</p>
+        </div>
+      </section>
+      <section class="how-row"><div><span class="how-num">01</span><strong>Vyber režim</strong><small>Sólo nebo závod s ostatními.</small></div><div><span class="how-num">02</span><strong>Nastav trasu</strong><small>Vyber start a cílový článek.</small></div><div><span class="how-num">03</span><strong>Proklikej se</strong><small>Každý odkaz tě posune dál.</small></div></section>
+      <footer class="site-footer"><span>© WIKI SPRINT</span><span>POSTAVENO ZVĚDAVOSTÍ <b>✳</b></span></footer>
+    </main>`;
+
+  const nicknameInput = app.querySelector<HTMLInputElement>('#nickname-input')!;
+  const chooseMode = (mode: 'single' | 'multiplayer') => {
+    const nickname = nicknameInput.value.trim();
+    const error = app.querySelector<HTMLParagraphElement>('#nickname-error')!;
+    if (!nickname) {
+      error.textContent = 'Nejdřív zadej svoji přezdívku.';
+      nicknameInput.focus();
+      return;
+    }
+    playerName = nickname;
+    if (mode === 'single') renderRouteSetup();
+    else renderMultiplayerIntro();
+  };
+  app.querySelector('#single-mode')!.addEventListener('click', () => chooseMode('single'));
+  app.querySelector('#multi-mode')!.addEventListener('click', () => chooseMode('multiplayer'));
+  nicknameInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') chooseMode('single');
+  });
+}
+
+function renderMultiplayerIntro() {
+  app.innerHTML = `
+    <main class="setup-shell welcome-shell">
+      <header class="topbar"><button class="back-button welcome-back" id="back-to-modes">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> MULTIPLAYER</span></header>
+      <section class="hero welcome-hero">
+        <div class="hero-copy"><p class="eyebrow"><span>${escapeHtml(playerName)}</span> ZÁVOD S OSTATNÍMI</p><h1>Najdi cestu<br><em>rychleji.</em></h1><p class="intro">Vytvoř místnost, nastav trasu a pošli její kód kamarádům. Nebo se připoj ke kódu, který už máš.</p></div>
+        <div class="route-card welcome-card multiplayer-card">
+          <div class="card-top"><span class="card-label">VYTVOŘIT ONLINE ZÁVOD</span><span class="route-icon">01</span></div>
+          <label class="field-label" for="mp-start-input">STARTOVNÍ ČLÁNEK</label>
+          <div class="input-wrap"><span class="field-symbol">◉</span><input id="mp-start-input" autocomplete="off" placeholder="např. Praha" required></div>
+          <div class="route-connector"><span></span><small>TRASA MÍSTNOSTI</small><span></span></div>
+          <label class="field-label" for="mp-target-input">CÍLOVÝ ČLÁNEK</label>
+          <div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="mp-target-input" autocomplete="off" placeholder="např. Měsíc" required></div>
+          <div class="language-row"><span>JAZYK WIKIPEDIE</span><div class="language-switch"><button class="lang-choice active" data-lang="cs">ČEŠTINA</button><button class="lang-choice" data-lang="en">ENGLISH</button></div></div>
+          <button class="start-button mode-button" id="create-room"><span>VYTVOŘIT MÍSTNOST</span></button>
+          <div class="room-divider"><span>NEBO SE PŘIPOJ</span></div>
+          <label class="field-label" for="room-code-input">KÓD MÍSTNOSTI</label>
+          <div class="input-wrap"><span class="field-symbol room-code-symbol">#</span><input id="room-code-input" autocomplete="off" maxlength="14" placeholder="např. A1B2-C3D4-E5F6"></div>
+          <button class="mode-button mode-button-secondary" id="join-room"><span>PŘIPOJIT SE</span></button>
+          <p class="form-error" id="multiplayer-error" aria-live="polite"></p>
+          <p class="microcopy">Až šest hráčů v jedné místnosti.</p>
+        </div>
+      </section>
+      <footer class="site-footer"><span>© WIKI SPRINT</span><span>PŘIHLÁŠEN/A JAKO ${escapeHtml(playerName.toLocaleUpperCase())}</span></footer>
+    </main>`;
+  app.querySelector('#back-to-modes')!.addEventListener('click', renderWelcome);
+  const startInput = app.querySelector<HTMLInputElement>('#mp-start-input')!;
+  const targetInput = app.querySelector<HTMLInputElement>('#mp-target-input')!;
+  app.querySelectorAll<HTMLButtonElement>('.lang-choice').forEach((button) => button.addEventListener('click', () => {
+    language = button.dataset.lang ?? 'cs';
+    app.querySelectorAll('.lang-choice').forEach((choice) => choice.classList.toggle('active', choice === button));
+  }));
+  app.querySelector('#create-room')!.addEventListener('click', () => createRoom(startInput.value, targetInput.value));
+  app.querySelector('#join-room')!.addEventListener('click', () => joinRoom(app.querySelector<HTMLInputElement>('#room-code-input')!.value));
+  [startInput, targetInput, app.querySelector<HTMLInputElement>('#room-code-input')!].forEach((input) => input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      if (input.id === 'room-code-input') app.querySelector<HTMLButtonElement>('#join-room')!.click();
+      else app.querySelector<HTMLButtonElement>('#create-room')!.click();
+    }
+  }));
+}
+
+function normalizedRoomCode(input: string) {
+  return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function formatRoomCode(code: string) {
+  return code.match(/.{1,4}/g)?.join('-') ?? code;
+}
+
+function peerIdForRoom(code: string) {
+  return `wikisprint-${code.toLowerCase()}`;
+}
+
+function newRoomCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+function showMultiplayerError(message: string) {
+  const error = app.querySelector<HTMLElement>('#multiplayer-error, #room-status');
+  if (error) error.textContent = message;
+}
+
+function setupPeerEvents(peer: Peer) {
+  peer.on('error', (error) => {
+    const message = error.type === 'peer-unavailable'
+      ? 'Místnost s tímto kódem neexistuje nebo už není dostupná.'
+      : error.type === 'unavailable-id'
+        ? 'Tento kód je už obsazený. Zkus vytvořit místnost znovu.'
+        : 'Nepodařilo se připojit k online službě. Zkus to za chvíli znovu.';
+    showMultiplayerError(message);
+    app.querySelectorAll<HTMLButtonElement>('#create-room, #join-room').forEach((button) => { button.disabled = false; });
+  });
+}
+
+function createRoom(start: string, target: string) {
+  startTitle = cleanTitle(start);
+  targetTitle = cleanTitle(target);
+  if (!startTitle || !targetTitle) { showMultiplayerError('Vyplň startovní i cílový článek.'); return; }
+  if (startTitle.toLocaleLowerCase() === targetTitle.toLocaleLowerCase()) { showMultiplayerError('Start a cíl musí být dva různé články.'); return; }
+
+  isMultiplayer = true;
+  isRoomHost = true;
+  roomStarted = false;
+  roomCode = newRoomCode();
+  route = [startTitle];
+  multiplayerPlayers.clear();
+  app.querySelector<HTMLButtonElement>('#create-room')!.disabled = true;
+  showMultiplayerError('Vytvářím místnost…');
+
+  const peer = new Peer(peerIdForRoom(roomCode), { debug: 1 });
+  currentPeer = peer;
+  setupPeerEvents(peer);
+  peer.on('open', (id) => {
+    multiplayerPlayers.set(id, { id, name: playerName, clicks: 0, article: startTitle, finished: false, elapsedSeconds: 0 });
+    peer.on('connection', (connection) => acceptRoomConnection(connection));
+    renderRoomLobby();
+  });
+}
+
+function acceptRoomConnection(connection: DataConnection) {
+  roomConnections.set(connection.peer, connection);
+  connection.on('data', (data) => {
+    const packet = data as RoomPacket;
+    if (packet.type === 'join') {
+      if (roomStarted || multiplayerPlayers.size >= 6) {
+        connection.send({ type: 'error', message: roomStarted ? 'Závod už začal. Počkej na další místnost.' : 'Místnost je plná (maximálně 6 hráčů).' });
+        connection.close();
+        return;
+      }
+      multiplayerPlayers.set(connection.peer, { id: connection.peer, name: packet.name.slice(0, 20), clicks: 0, article: startTitle, finished: false, elapsedSeconds: 0 });
+      sendRoomSnapshot(connection);
+      broadcastRoomSnapshot();
+      renderRoomLobby();
+    } else if (packet.type === 'progress') {
+      const existing = multiplayerPlayers.get(connection.peer);
+      if (!existing) return;
+      multiplayerPlayers.set(connection.peer, { ...existing, clicks: packet.clicks, article: packet.article, finished: packet.finished && packet.article.toLocaleLowerCase() === targetTitle.toLocaleLowerCase(), elapsedSeconds: packet.elapsedSeconds });
+      broadcastRoomSnapshot();
+      renderPlayersHud();
+    }
+  });
+  connection.on('close', () => {
+    roomConnections.delete(connection.peer);
+    multiplayerPlayers.delete(connection.peer);
+    broadcastRoomSnapshot();
+    if (!roomStarted) renderRoomLobby();
+    else renderPlayersHud();
+  });
+}
+
+function joinRoom(codeInput: string) {
+  const code = normalizedRoomCode(codeInput);
+  if (!/^[A-F0-9]{12}$/.test(code)) { showMultiplayerError('Zadej celý 12místný kód místnosti.'); return; }
+  roomCode = formatRoomCode(code);
+  startTitle = '';
+  targetTitle = '';
+  isMultiplayer = true;
+  isRoomHost = false;
+  roomStarted = false;
+  multiplayerPlayers.clear();
+  app.querySelector<HTMLButtonElement>('#join-room')!.disabled = true;
+  showMultiplayerError('Připojuji se do místnosti…');
+
+  const peer = new Peer({ debug: 1 });
+  currentPeer = peer;
+  setupPeerEvents(peer);
+  peer.on('open', () => {
+    const connection = peer.connect(peerIdForRoom(code), { reliable: true });
+    hostConnection = connection;
+    connection.on('open', () => {
+      connection.send({ type: 'join', name: playerName });
+      multiplayerPlayers.set(peer.id, { id: peer.id, name: playerName, clicks: 0, article: '', finished: false, elapsedSeconds: 0 });
+      renderRoomLobby();
+    });
+    connection.on('data', (data) => handleRoomPacket(data as RoomPacket));
+    connection.on('close', () => showMultiplayerError('Spojení s místností bylo přerušeno.'));
+    connection.on('error', () => showMultiplayerError('Nepodařilo se připojit. Zkontroluj kód místnosti.'));
+  });
+}
+
+function roomSnapshot(): RoomPacket {
+  return { type: 'room', startTitle, targetTitle, language, players: [...multiplayerPlayers.values()], started: roomStarted, startsAt: roomStartsAt };
+}
+
+function sendRoomSnapshot(connection: DataConnection) {
+  if (connection.open) connection.send(roomSnapshot());
+}
+
+function broadcastRoomSnapshot() {
+  const snapshot = roomSnapshot();
+  roomConnections.forEach((connection) => { if (connection.open) connection.send(snapshot); });
+}
+
+function handleRoomPacket(packet: RoomPacket) {
+  if (packet.type === 'error') { showMultiplayerError(packet.message); return; }
+  if (packet.type === 'room') {
+    startTitle = packet.startTitle;
+    targetTitle = packet.targetTitle;
+    language = packet.language;
+    roomStarted = packet.started;
+    roomStartsAt = packet.startsAt;
+    multiplayerPlayers = new Map(packet.players.map((player) => [player.id, player] as const));
+    if (!roomStarted) renderRoomLobby();
+    else renderPlayersHud();
+  } else if (packet.type === 'start') {
+    startTitle = packet.startTitle;
+    targetTitle = packet.targetTitle;
+    language = packet.language;
+    roomStarted = true;
+    roomStartsAt = Date.now() + packet.countdownMs;
+    window.clearTimeout(startTimeout);
+    startTimeout = window.setTimeout(beginMultiplayerGame, packet.countdownMs);
+  }
+}
+
+function renderRoomLobby() {
+  const isConnected = isRoomHost || hostConnection?.open === true;
+  const players = [...multiplayerPlayers.values()];
+  app.innerHTML = `
+    <main class="setup-shell welcome-shell room-shell">
+      <header class="topbar"><button class="back-button welcome-back" id="leave-room">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> ${isConnected ? 'V MÍSTNOSTI' : 'PŘIPOJOVÁNÍ'}</span></header>
+      <section class="hero welcome-hero room-hero">
+        <div class="hero-copy"><p class="eyebrow"><span>${escapeHtml(playerName)}</span> ONLINE ZÁVOD</p><h1>Všichni<br>na <em>start.</em></h1><p class="intro">Pošli kód ostatním. Jakmile se připojí, hostitel odstartuje společný závod.</p></div>
+        <div class="route-card welcome-card room-card">
+          <div class="card-top"><span class="card-label">KÓD MÍSTNOSTI</span><span class="route-icon">${isRoomHost ? 'HOST' : 'HRÁČ'}</span></div>
+          <div class="room-code-display" id="room-code-display">${escapeHtml(roomCode)}</div>
+          ${isRoomHost ? '<button class="mode-button mode-button-secondary copy-room-code" id="copy-room-code"><span>KOPÍROVAT KÓD</span></button>' : ''}
+          <div class="room-route"><span>TRASA</span><strong>${escapeHtml(startTitle || 'Čekám na hostitele')}${targetTitle ? ` — ${escapeHtml(targetTitle)}` : ''}</strong><small>${language === 'cs' ? 'ČEŠTINA' : 'ANGLIČTINA'}</small></div>
+          <div class="room-players-heading"><span class="card-label">HRÁČI</span><span class="room-player-count">${players.length} / 6</span></div>
+          <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}</span><span class="player-state">${player.finished ? 'CÍL' : player.clicks ? `${player.clicks} KLIKŮ` : 'PŘIPRAVEN'}</span></li>`).join('')}</ul>
+          <p class="form-error room-status" id="room-status">${isRoomHost ? (players.length > 1 ? 'Všichni jsou připraveni.' : 'Čekám na další hráče…') : 'Připojování k hostiteli…'}</p>
+          ${isRoomHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 ? 'disabled' : ''}><span>ODSTARTOVAT ZÁVOD</span></button>` : '<div class="room-waiting">ČEKÁM, AŽ HOSTITEL ODSTARTUJE</div>'}
+        </div>
+      </section>
+      <footer class="site-footer"><span>© WIKI SPRINT</span><span>HRÁČI SE PŘIPOJUJÍ PŘES PEER-TO-PEER</span></footer>
+    </main>`;
+  app.querySelector('#leave-room')!.addEventListener('click', goHome);
+  app.querySelector('#copy-room-code')?.addEventListener('click', () => {
+    if (!navigator.clipboard) { showMultiplayerError(`Kód místnosti: ${roomCode}`); return; }
+    void navigator.clipboard.writeText(roomCode).then(() => showMultiplayerError('Kód místnosti zkopírován.')).catch(() => showMultiplayerError(`Kód místnosti: ${roomCode}`));
+  });
+  app.querySelector('#start-multiplayer')?.addEventListener('click', startMultiplayerRace);
+}
+
+function startMultiplayerRace() {
+  if (!isRoomHost || multiplayerPlayers.size < 2) return;
+  roomStarted = true;
+  roomStartsAt = Date.now() + 3000;
+  const packet: RoomPacket = { type: 'start', startTitle, targetTitle, language, countdownMs: 3000 };
+  roomConnections.forEach((connection) => { if (connection.open) connection.send(packet); });
+  startTimeout = window.setTimeout(beginMultiplayerGame, Math.max(0, roomStartsAt - Date.now()));
+}
+
+function beginMultiplayerGame() {
+  if (!isMultiplayer) return;
+  clicks = 0;
+  currentTitle = '';
+  route = [startTitle];
+  startedAt = roomStartsAt || Date.now();
+  renderGame();
+  void loadArticle(startTitle, false);
+}
+
+function reportMultiplayerProgress(article: string) {
+  if (!isMultiplayer || !currentPeer) return;
+  const player: MultiplayerPlayer = {
+    id: currentPeer.id,
+    name: playerName,
+    clicks,
+    article,
+    finished: article.toLocaleLowerCase() === targetTitle.toLocaleLowerCase(),
+    elapsedSeconds: Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
+  };
+  if (isRoomHost) {
+    multiplayerPlayers.set(player.id, player);
+    broadcastRoomSnapshot();
+  } else {
+    hostConnection?.send({ type: 'progress', name: player.name, clicks: player.clicks, article: player.article, finished: player.finished, elapsedSeconds: player.elapsedSeconds });
+  }
+  renderPlayersHud();
+}
+
+function renderPlayersHud() {
+  const list = app.querySelector<HTMLUListElement>('#players-list');
+  if (!list) return;
+  list.innerHTML = [...multiplayerPlayers.values()].sort((a, b) => Number(b.finished) - Number(a.finished) || a.elapsedSeconds - b.elapsedSeconds).map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}</span><span class="player-state">${player.finished ? `CÍL · ${formatTime(player.elapsedSeconds)}` : `${player.clicks} KLIKŮ`}</span></li>`).join('');
+}
+
+function renderRouteSetup() {
   app.innerHTML = `
     <main class="setup-shell">
-      <header class="topbar"><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> TVŮJ DALŠÍ KLIK MŮŽE BÝT CÍL</span></header>
+      <header class="topbar"><button class="back-button welcome-back" id="back-to-modes">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> ${escapeHtml(playerName.toLocaleUpperCase())} · SINGLEPLAYER</span></header>
       <section class="hero">
         <div class="hero-copy"><p class="eyebrow"><span>01</span> WIKIPEDIE, ALE JAKO ZÁVOD</p><h1>Jak rychle<br>najdeš <em>cestu?</em></h1><p class="intro">Začni na jednom článku. Skonči na druhém. Mezitím se můžeš pohybovat jen po odkazech.</p></div>
         <div class="route-card">
@@ -50,6 +379,7 @@ function renderSetup() {
     </main>`;
   const startInput = app.querySelector<HTMLInputElement>('#start-input')!;
   const targetInput = app.querySelector<HTMLInputElement>('#target-input')!;
+  app.querySelector('#back-to-modes')!.addEventListener('click', renderWelcome);
   app.querySelectorAll<HTMLButtonElement>('.lang-choice').forEach((button) => button.addEventListener('click', () => {
     language = button.dataset.lang ?? 'cs';
     app.querySelectorAll('.lang-choice').forEach((choice) => choice.classList.toggle('active', choice === button));
@@ -87,6 +417,7 @@ function renderGame() {
           <div class="timer-card"><div class="timer-label">UPLYNULÝ ČAS</div><div id="timer" class="timer">00:00</div><div class="timer-foot"><span class="pulse-dot"></span> ČAS BĚŽÍ</div></div>
           <div class="goal-card"><span class="goal-kicker">DOSTAŇ SE NA ČLÁNEK</span><div class="goal-title" id="goal-title">${escapeHtml(targetTitle)}</div><a id="goal-link" href="${wikiUrl(targetTitle)}" target="_blank" rel="noreferrer">ZOBRAZIT ČLÁNEK</a></div>
           <div class="stats-row"><div class="stat-card"><span>PROKLIKNUTÍ</span><strong id="click-count">00</strong></div></div>
+          ${isMultiplayer ? '<div class="players-card"><div class="route-small-title">HRÁČI V ZÁVODĚ</div><ul class="room-player-list" id="players-list"></ul></div>' : ''}
           <div class="route-card-small"><div class="route-small-title">TVOJE TRASA</div><ol id="route-list"><li><i class="route-dot start-dot"></i><span class="route-item">${escapeHtml(startTitle)}</span><b>START</b></li></ol></div>
           <button class="new-game" id="new-game">NOVÁ HRA</button>
         </aside>
@@ -97,13 +428,14 @@ function renderGame() {
   if (timerId) window.clearInterval(timerId);
   timerId = window.setInterval(() => {
     const timer = app.querySelector<HTMLDivElement>('#timer');
-    if (timer) timer.textContent = formatTime(Math.floor((Date.now() - startedAt) / 1000));
+    if (timer) timer.textContent = formatTime(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
   }, 250);
   app.querySelector('#quit-game')!.addEventListener('click', () => confirmExit());
   app.querySelector('#give-up')!.addEventListener('click', () => showResult(false));
   app.querySelector('#new-game')!.addEventListener('click', () => confirmExit());
   app.querySelector('#reload-article')!.addEventListener('click', () => { if (currentTitle) void loadArticle(currentTitle, false); });
   app.querySelector('#open-original')!.addEventListener('click', () => window.open(wikiUrl(currentTitle || startTitle), '_blank', 'noopener,noreferrer'));
+  renderPlayersHud();
 }
 
 async function loadArticle(title: string, isClick: boolean) {
@@ -147,6 +479,7 @@ async function navigateToArticle(title: string) {
   if (!route.some((item) => item.toLocaleLowerCase() === title.toLocaleLowerCase())) route.push(title);
   updateHud();
   await loadArticle(title, true);
+  reportMultiplayerProgress(currentTitle || title);
 }
 
 function updateHud() {
@@ -164,9 +497,12 @@ function showResult(won: boolean) {
   const overlay = app.querySelector<HTMLDivElement>('#result-overlay');
   if (!overlay) return;
   overlay.classList.remove('hidden');
-  overlay.innerHTML = `<div class="result-card"><button id="close-result" class="result-close" aria-label="Zavřít">×</button><div class="result-symbol">✳</div><p class="eyebrow">${won ? 'CÍL DORUČEN' : 'KAŽDÁ CESTA NĚCO NAUČÍ'}</p><h2>${won ? 'To byla jízda.' : 'Závod ukončen.'}</h2><p class="result-copy">${won ? `Dostal/a ses z článku <b>${escapeHtml(startTitle)}</b> až na <b>${escapeHtml(targetTitle)}</b>.` : `Tvůj cíl byl článek <b>${escapeHtml(targetTitle)}</b>. Zkus trasu znovu a najdi jinou cestu.`}</p><div class="result-stats"><div><span>ČAS</span><strong>${elapsed}</strong></div><div><span>KLIKNUTÍ</span><strong>${clicks.toString().padStart(2, '0')}</strong></div></div><button class="start-button" id="result-new-game"><span>JEŠTĚ JEDEN ZÁVOD</span></button><button class="text-button" id="result-home">ZMĚNIT TRASU</button></div>`;
+  overlay.innerHTML = `<div class="result-card"><button id="close-result" class="result-close" aria-label="Zavřít">×</button><div class="result-symbol">✳</div><p class="eyebrow">${won ? 'CÍL DORUČEN' : 'KAŽDÁ CESTA NĚCO NAUČÍ'}</p><h2>${won ? 'To byla jízda.' : 'Závod ukončen.'}</h2><p class="result-copy">${won ? `Dostal/a ses z článku <b>${escapeHtml(startTitle)}</b> až na <b>${escapeHtml(targetTitle)}</b>.` : `Tvůj cíl byl článek <b>${escapeHtml(targetTitle)}</b>. Zkus trasu znovu a najdi jinou cestu.`}</p><div class="result-stats"><div><span>ČAS</span><strong>${elapsed}</strong></div><div><span>KLIKNUTÍ</span><strong>${clicks.toString().padStart(2, '0')}</strong></div></div><button class="start-button" id="result-new-game"><span>${isMultiplayer ? 'OPUSTIT MÍSTNOST' : 'JEŠTĚ JEDEN ZÁVOD'}</span></button><button class="text-button" id="result-home">ZMĚNIT TRASU</button></div>`;
   overlay.querySelector('#close-result')!.addEventListener('click', () => overlay.classList.add('hidden'));
-  overlay.querySelector('#result-new-game')!.addEventListener('click', () => { overlay.classList.add('hidden'); startedAt = Date.now(); clicks = 0; route = [startTitle]; renderGame(); void loadArticle(startTitle, false); });
+  overlay.querySelector('#result-new-game')!.addEventListener('click', () => {
+    if (isMultiplayer) { goHome(); return; }
+    overlay.classList.add('hidden'); startedAt = Date.now(); clicks = 0; route = [startTitle]; renderGame(); void loadArticle(startTitle, false);
+  });
   overlay.querySelector('#result-home')!.addEventListener('click', goHome);
 }
 
@@ -182,11 +518,24 @@ function confirmExit() {
 
 function goHome() {
   if (timerId) window.clearInterval(timerId);
+  if (startTimeout) window.clearTimeout(startTimeout);
+  currentPeer?.destroy();
+  currentPeer = null;
+  hostConnection = null;
+  roomConnections.clear();
+  multiplayerPlayers.clear();
+  isMultiplayer = false;
+  isRoomHost = false;
+  roomStarted = false;
+  roomCode = '';
+  roomStartsAt = 0;
+  startTitle = '';
+  targetTitle = '';
   currentTitle = '';
   clicks = 0;
   route = [];
   loading = false;
-  renderSetup();
+  renderWelcome();
 }
 
-renderSetup();
+renderWelcome();
