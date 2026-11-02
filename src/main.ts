@@ -9,6 +9,7 @@ type RoomPacket =
   | { type: 'room'; startTitle: string; targetTitle: string; language: string; players: MultiplayerPlayer[]; started: boolean; startsAt: number }
   | { type: 'start'; startTitle: string; targetTitle: string; language: string; countdownMs: number }
   | { type: 'progress'; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number }
+  | { type: 'kicked'; message: string }
   | { type: 'error'; message: string };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -93,16 +94,10 @@ function renderMultiplayerIntro() {
         <div class="hero-copy"><p class="eyebrow"><span>${escapeHtml(playerName)}</span> ZÁVOD S OSTATNÍMI</p><h1>Najdi cestu<br><em>rychleji.</em></h1><p class="intro">Vytvoř místnost, nastav trasu a pošli její kód kamarádům. Nebo se připoj ke kódu, který už máš.</p></div>
         <div class="route-card welcome-card multiplayer-card">
           <div class="card-top"><span class="card-label">VYTVOŘIT ONLINE ZÁVOD</span><span class="route-icon">01</span></div>
-          <label class="field-label" for="mp-start-input">STARTOVNÍ ČLÁNEK</label>
-          <div class="input-wrap"><span class="field-symbol">◉</span><input id="mp-start-input" autocomplete="off" placeholder="např. Praha" required></div>
-          <div class="route-connector"><span></span><small>TRASA MÍSTNOSTI</small><span></span></div>
-          <label class="field-label" for="mp-target-input">CÍLOVÝ ČLÁNEK</label>
-          <div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="mp-target-input" autocomplete="off" placeholder="např. Měsíc" required></div>
-          <div class="language-row"><span>JAZYK WIKIPEDIE</span><div class="language-switch"><button class="lang-choice active" data-lang="cs">ČEŠTINA</button><button class="lang-choice" data-lang="en">ENGLISH</button></div></div>
           <button class="start-button mode-button" id="create-room"><span>VYTVOŘIT MÍSTNOST</span></button>
           <div class="room-divider"><span>NEBO SE PŘIPOJ</span></div>
           <label class="field-label" for="room-code-input">KÓD MÍSTNOSTI</label>
-          <div class="input-wrap"><span class="field-symbol room-code-symbol">#</span><input id="room-code-input" autocomplete="off" maxlength="14" placeholder="např. A1B2-C3D4-E5F6"></div>
+          <div class="input-wrap"><span class="field-symbol room-code-symbol">#</span><input id="room-code-input" autocomplete="one-time-code" inputmode="numeric" maxlength="4" placeholder="např. 4827" aria-label="Čtyřmístný kód místnosti"></div>
           <button class="mode-button mode-button-secondary" id="join-room"><span>PŘIPOJIT SE</span></button>
           <p class="form-error" id="multiplayer-error" aria-live="polite"></p>
           <p class="microcopy">Až šest hráčů v jedné místnosti.</p>
@@ -111,28 +106,25 @@ function renderMultiplayerIntro() {
       <footer class="site-footer"><span>© WIKI SPRINT</span><span>PŘIHLÁŠEN/A JAKO ${escapeHtml(playerName.toLocaleUpperCase())}</span></footer>
     </main>`;
   app.querySelector('#back-to-modes')!.addEventListener('click', renderWelcome);
-  const startInput = app.querySelector<HTMLInputElement>('#mp-start-input')!;
-  const targetInput = app.querySelector<HTMLInputElement>('#mp-target-input')!;
-  app.querySelectorAll<HTMLButtonElement>('.lang-choice').forEach((button) => button.addEventListener('click', () => {
-    language = button.dataset.lang ?? 'cs';
-    app.querySelectorAll('.lang-choice').forEach((choice) => choice.classList.toggle('active', choice === button));
-  }));
-  app.querySelector('#create-room')!.addEventListener('click', () => createRoom(startInput.value, targetInput.value));
+  app.querySelector('#create-room')!.addEventListener('click', createRoom);
   app.querySelector('#join-room')!.addEventListener('click', () => joinRoom(app.querySelector<HTMLInputElement>('#room-code-input')!.value));
-  [startInput, targetInput, app.querySelector<HTMLInputElement>('#room-code-input')!].forEach((input) => input.addEventListener('keydown', (event) => {
+  app.querySelector<HTMLInputElement>('#room-code-input')!.addEventListener('input', (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    input.value = input.value.replace(/\D/g, '').slice(0, 4);
+  });
+  app.querySelector<HTMLInputElement>('#room-code-input')!.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
-      if (input.id === 'room-code-input') app.querySelector<HTMLButtonElement>('#join-room')!.click();
-      else app.querySelector<HTMLButtonElement>('#create-room')!.click();
+      app.querySelector<HTMLButtonElement>('#join-room')!.click();
     }
-  }));
+  });
 }
 
 function normalizedRoomCode(input: string) {
-  return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return input.replace(/\D/g, '').slice(0, 4);
 }
 
 function formatRoomCode(code: string) {
-  return code.match(/.{1,4}/g)?.join('-') ?? code;
+  return code;
 }
 
 function peerIdForRoom(code: string) {
@@ -140,8 +132,7 @@ function peerIdForRoom(code: string) {
 }
 
 function newRoomCode() {
-  const bytes = crypto.getRandomValues(new Uint8Array(6));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
+  return (crypto.getRandomValues(new Uint16Array(1))[0] % 10_000).toString().padStart(4, '0');
 }
 
 function showMultiplayerError(message: string) {
@@ -161,17 +152,14 @@ function setupPeerEvents(peer: Peer) {
   });
 }
 
-function createRoom(start: string, target: string) {
-  startTitle = cleanTitle(start);
-  targetTitle = cleanTitle(target);
-  if (!startTitle || !targetTitle) { showMultiplayerError('Vyplň startovní i cílový článek.'); return; }
-  if (startTitle.toLocaleLowerCase() === targetTitle.toLocaleLowerCase()) { showMultiplayerError('Start a cíl musí být dva různé články.'); return; }
-
+function createRoom() {
+  startTitle = '';
+  targetTitle = '';
   isMultiplayer = true;
   isRoomHost = true;
   roomStarted = false;
   roomCode = newRoomCode();
-  route = [startTitle];
+  route = [];
   multiplayerPlayers.clear();
   app.querySelector<HTMLButtonElement>('#create-room')!.disabled = true;
   showMultiplayerError('Vytvářím místnost…');
@@ -180,10 +168,53 @@ function createRoom(start: string, target: string) {
   currentPeer = peer;
   setupPeerEvents(peer);
   peer.on('open', (id) => {
-    multiplayerPlayers.set(id, { id, name: playerName, clicks: 0, article: startTitle, finished: false, elapsedSeconds: 0 });
+    multiplayerPlayers.set(id, { id, name: playerName, clicks: 0, article: '', finished: false, elapsedSeconds: 0 });
     peer.on('connection', (connection) => acceptRoomConnection(connection));
-    renderRoomLobby();
+    renderRoomRouteSetup();
   });
+}
+
+function renderRoomRouteSetup() {
+  app.innerHTML = `
+    <main class="setup-shell welcome-shell">
+      <header class="topbar"><button class="back-button welcome-back" id="cancel-room">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> NOVÁ MÍSTNOST · ${escapeHtml(roomCode)}</span></header>
+      <section class="hero welcome-hero">
+        <div class="hero-copy"><p class="eyebrow"><span>HOSTITEL</span> NASTAV TRASU</p><h1>Vyberte si<br><em>cíl závodu.</em></h1><p class="intro">Kód místnosti je připravený. Nejdřív zvol startovní a cílový článek, potom se otevře lobby pro ostatní.</p></div>
+        <div class="route-card welcome-card multiplayer-card">
+          <div class="card-top"><span class="card-label">TRASA MÍSTNOSTI</span><span class="route-icon">01</span></div>
+          <label class="field-label" for="mp-start-input">STARTOVNÍ ČLÁNEK</label>
+          <div class="input-wrap"><span class="field-symbol">◉</span><input id="mp-start-input" autocomplete="off" placeholder="např. Praha" required></div>
+          <div class="route-connector"><span></span><small>DOJEĎ NA</small><span></span></div>
+          <label class="field-label" for="mp-target-input">CÍLOVÝ ČLÁNEK</label>
+          <div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="mp-target-input" autocomplete="off" placeholder="např. Měsíc" required></div>
+          <div class="language-row"><span>JAZYK WIKIPEDIE</span><div class="language-switch"><button class="lang-choice${language === 'cs' ? ' active' : ''}" data-lang="cs">ČEŠTINA</button><button class="lang-choice${language === 'en' ? ' active' : ''}" data-lang="en">ENGLISH</button></div></div>
+          <button class="start-button mode-button" id="save-room-route"><span>POKRAČOVAT DO LOBBY</span></button>
+          <p class="form-error" id="multiplayer-error" aria-live="polite"></p>
+        </div>
+      </section>
+      <footer class="site-footer"><span>© WIKI SPRINT</span><span>KÓD MÍSTNOSTI ${escapeHtml(roomCode)}</span></footer>
+    </main>`;
+  app.querySelector('#cancel-room')!.addEventListener('click', goHome);
+  app.querySelectorAll<HTMLButtonElement>('.lang-choice').forEach((button) => button.addEventListener('click', () => {
+    language = button.dataset.lang ?? 'cs';
+    app.querySelectorAll('.lang-choice').forEach((choice) => choice.classList.toggle('active', choice === button));
+  }));
+  const submitRoute = () => {
+    const start = cleanTitle(app.querySelector<HTMLInputElement>('#mp-start-input')!.value);
+    const target = cleanTitle(app.querySelector<HTMLInputElement>('#mp-target-input')!.value);
+    if (!start || !target) { showMultiplayerError('Vyplň startovní i cílový článek.'); return; }
+    if (start.toLocaleLowerCase() === target.toLocaleLowerCase()) { showMultiplayerError('Start a cíl musí být dva různé články.'); return; }
+    startTitle = start;
+    targetTitle = target;
+    route = [startTitle];
+    multiplayerPlayers.set(currentPeer!.id, { id: currentPeer!.id, name: playerName, clicks: 0, article: startTitle, finished: false, elapsedSeconds: 0 });
+    renderRoomLobby();
+    broadcastRoomSnapshot();
+  };
+  app.querySelector('#save-room-route')!.addEventListener('click', submitRoute);
+  ['#mp-start-input', '#mp-target-input'].forEach((selector) => app.querySelector<HTMLInputElement>(selector)!.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') submitRoute();
+  }));
 }
 
 function acceptRoomConnection(connection: DataConnection) {
@@ -191,8 +222,8 @@ function acceptRoomConnection(connection: DataConnection) {
   connection.on('data', (data) => {
     const packet = data as RoomPacket;
     if (packet.type === 'join') {
-      if (roomStarted || multiplayerPlayers.size >= 6) {
-        connection.send({ type: 'error', message: roomStarted ? 'Závod už začal. Počkej na další místnost.' : 'Místnost je plná (maximálně 6 hráčů).' });
+      if (roomStarted || !startTitle || !targetTitle || multiplayerPlayers.size >= 6 || [...multiplayerPlayers.values()].some((player) => player.name === packet.name.slice(0, 20))) {
+        connection.send({ type: 'error', message: roomStarted ? 'Závod už začal. Počkej na další místnost.' : !startTitle ? 'Hostitel ještě nastavuje trasu.' : [...multiplayerPlayers.values()].some((player) => player.name === packet.name.slice(0, 20)) ? 'Tato přezdívka už v místnosti je.' : 'Místnost je plná (maximálně 6 hráčů).' });
         connection.close();
         return;
       }
@@ -219,7 +250,7 @@ function acceptRoomConnection(connection: DataConnection) {
 
 function joinRoom(codeInput: string) {
   const code = normalizedRoomCode(codeInput);
-  if (!/^[A-F0-9]{12}$/.test(code)) { showMultiplayerError('Zadej celý 12místný kód místnosti.'); return; }
+  if (!/^\d{4}$/.test(code)) { showMultiplayerError('Zadej celý čtyřmístný číselný kód.'); return; }
   roomCode = formatRoomCode(code);
   startTitle = '';
   targetTitle = '';
@@ -262,6 +293,17 @@ function broadcastRoomSnapshot() {
 
 function handleRoomPacket(packet: RoomPacket) {
   if (packet.type === 'error') { showMultiplayerError(packet.message); return; }
+  if (packet.type === 'kicked') {
+    showMultiplayerError(packet.message);
+    currentPeer?.destroy();
+    currentPeer = null;
+    hostConnection = null;
+    roomCode = '';
+    isMultiplayer = false;
+    renderMultiplayerIntro();
+    showMultiplayerError(packet.message);
+    return;
+  }
   if (packet.type === 'room') {
     startTitle = packet.startTitle;
     targetTitle = packet.targetTitle;
@@ -296,7 +338,7 @@ function renderRoomLobby() {
           ${isRoomHost ? '<button class="mode-button mode-button-secondary copy-room-code" id="copy-room-code"><span>KOPÍROVAT KÓD</span></button>' : ''}
           <div class="room-route"><span>TRASA</span><strong>${escapeHtml(startTitle || 'Čekám na hostitele')}${targetTitle ? ` — ${escapeHtml(targetTitle)}` : ''}</strong><small>${language === 'cs' ? 'ČEŠTINA' : 'ANGLIČTINA'}</small></div>
           <div class="room-players-heading"><span class="card-label">HRÁČI</span><span class="room-player-count">${players.length} / 6</span></div>
-          <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}</span><span class="player-state">${player.finished ? 'CÍL' : player.clicks ? `${player.clicks} KLIKŮ` : 'PŘIPRAVEN'}</span></li>`).join('')}</ul>
+          <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === currentPeer?.id && isRoomHost ? ' · HOSTITEL' : ''}</span><span class="player-state">${player.finished ? 'CÍL' : player.clicks ? `${player.clicks} KLIKŮ` : 'PŘIPRAVEN'}</span>${isRoomHost && player.id !== currentPeer?.id ? `<button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
           <p class="form-error room-status" id="room-status">${isRoomHost ? (players.length > 1 ? 'Všichni jsou připraveni.' : 'Čekám na další hráče…') : 'Připojování k hostiteli…'}</p>
           ${isRoomHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 ? 'disabled' : ''}><span>ODSTARTOVAT ZÁVOD</span></button>` : '<div class="room-waiting">ČEKÁM, AŽ HOSTITEL ODSTARTUJE</div>'}
         </div>
@@ -309,6 +351,18 @@ function renderRoomLobby() {
     void navigator.clipboard.writeText(roomCode).then(() => showMultiplayerError('Kód místnosti zkopírován.')).catch(() => showMultiplayerError(`Kód místnosti: ${roomCode}`));
   });
   app.querySelector('#start-multiplayer')?.addEventListener('click', startMultiplayerRace);
+  app.querySelectorAll<HTMLButtonElement>('.kick-player').forEach((button) => button.addEventListener('click', () => kickRoomPlayer(button.dataset.kick ?? '')));
+}
+
+function kickRoomPlayer(playerId: string) {
+  if (!isRoomHost || !playerId) return;
+  const connection = roomConnections.get(playerId);
+  connection?.send({ type: 'kicked', message: 'Hostitel tě odebral z místnosti.' });
+  window.setTimeout(() => connection?.close(), 100);
+  roomConnections.delete(playerId);
+  multiplayerPlayers.delete(playerId);
+  broadcastRoomSnapshot();
+  renderRoomLobby();
 }
 
 function startMultiplayerRace() {

@@ -260,6 +260,8 @@ input:focus-visible {
 }
 
 .player-name {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   color: #e9eee7;
   font-size: 11px;
@@ -273,6 +275,23 @@ input:focus-visible {
   color: #9eab9e;
   font: 7px var(--mono);
   letter-spacing: 0.04em;
+}
+
+.kick-player {
+  flex: none;
+  padding: 6px 8px;
+  border: 1px solid rgba(245, 132, 116, 0.26);
+  border-radius: 6px;
+  background: rgba(245, 132, 116, 0.07);
+  color: #f3a092;
+  font: 7px var(--mono);
+  letter-spacing: 0.04em;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.kick-player:hover {
+  border-color: rgba(245, 132, 116, 0.55);
+  background: rgba(245, 132, 116, 0.14);
 }
 
 .room-status {
