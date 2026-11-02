@@ -3,7 +3,6 @@ import './style.css';
 type WikiArticle = { title: string; html: string; url: string };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
-const apiRoot = 'https://cs.wikipedia.org/w/api.php';
 let currentTitle = '';
 let startTitle = '';
 let targetTitle = '';
