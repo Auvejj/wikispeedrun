@@ -1,4 +1,5 @@
 import './style.css';
+import './modern.css';
 
 type WikiArticle = { title: string; html: string; url: string };
 

@@ -1,0 +1,586 @@
+:root {
+  color-scheme: dark;
+  --ink: #f0f4ee;
+  --muted: #9da8a0;
+  --green: #c2fb62;
+  --line: rgba(222, 235, 223, 0.12);
+}
+
+body {
+  color: var(--ink);
+  background: #101513;
+}
+
+body::before {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 14% 12%, rgba(102, 143, 82, 0.15), transparent 34%),
+    radial-gradient(ellipse at 88% 78%, rgba(106, 126, 72, 0.12), transparent 32%),
+    #101513;
+  content: '';
+  pointer-events: none;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+
+.setup-shell {
+  position: relative;
+  isolation: isolate;
+  max-width: 1440px;
+  min-height: 100vh;
+  padding-right: 7.2%;
+  padding-left: 7.2%;
+}
+
+.topbar {
+  height: 82px;
+  border-color: var(--line);
+}
+
+.brand {
+  color: #f5f7f2;
+}
+
+.brand-mark {
+  border-radius: 9px;
+  box-shadow: 0 0 24px rgba(194, 251, 98, 0.18);
+}
+
+.brand-light,
+.top-note,
+.eyebrow,
+.intro,
+.card-label,
+.field-label,
+.language-row > span,
+.microcopy,
+.how-row small,
+.how-aside,
+.site-footer {
+  color: var(--muted);
+}
+
+.top-note i,
+.game-status i,
+.hud-live i {
+  background: var(--green);
+  box-shadow: 0 0 12px rgba(194, 251, 98, 0.62);
+}
+
+.hero {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+  gap: clamp(42px, 8vw, 112px);
+  padding-top: clamp(74px, 10vh, 124px);
+  padding-bottom: clamp(76px, 10vh, 120px);
+}
+
+.hero h1 {
+  color: #f4f6f1;
+  font-size: clamp(72px, 8.5vw, 112px);
+  letter-spacing: -0.085em;
+}
+
+.hero h1 em {
+  color: var(--green);
+}
+
+.intro {
+  max-width: 390px;
+  font-size: 15px;
+}
+
+.eyebrow span {
+  color: var(--green);
+}
+
+.route-card {
+  border: 1px solid rgba(224, 238, 225, 0.13);
+  border-radius: 17px;
+  padding: 30px;
+  background: linear-gradient(145deg, rgba(31, 40, 35, 0.96), rgba(23, 30, 27, 0.96));
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.27), inset 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.card-top {
+  margin-bottom: 27px;
+}
+
+.route-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--green);
+}
+
+.field-label {
+  color: #aeb9b0;
+}
+
+.input-wrap {
+  height: 52px;
+  border: 1px solid rgba(222, 235, 223, 0.13);
+  border-radius: 9px;
+  background: rgba(8, 12, 10, 0.32);
+}
+
+.input-wrap:focus-within {
+  border-color: rgba(194, 251, 98, 0.72);
+  box-shadow: 0 0 0 3px rgba(194, 251, 98, 0.08);
+}
+
+.input-wrap input {
+  color: #f2f5ee;
+}
+
+.input-wrap input::placeholder {
+  color: #78837b;
+}
+
+.field-symbol,
+.target-symbol {
+  color: var(--green);
+}
+
+.route-connector span {
+  background: rgba(222, 235, 223, 0.18);
+}
+
+.route-connector small,
+.language-row > span {
+  color: #849188;
+}
+
+.language-switch {
+  border: 1px solid rgba(222, 235, 223, 0.13);
+  border-radius: 7px;
+  padding: 3px;
+}
+
+.lang-choice {
+  border-radius: 5px;
+  color: #98a39a;
+}
+
+.lang-choice.active {
+  color: #eaf2e3;
+  background: rgba(194, 251, 98, 0.12);
+}
+
+.start-button {
+  height: 54px;
+  border-radius: 9px;
+  color: #172012;
+  font-weight: 500;
+  box-shadow: 0 7px 24px rgba(194, 251, 98, 0.1);
+}
+
+.start-button:hover {
+  background: #d0ff7c;
+  box-shadow: 0 10px 30px rgba(194, 251, 98, 0.2);
+}
+
+.microcopy {
+  color: #87938a;
+}
+
+.form-error {
+  color: #ff9c8e;
+}
+
+.how-row {
+  border-color: var(--line);
+  padding: 27px 18px;
+}
+
+.how-num {
+  color: var(--green);
+}
+
+.how-row strong {
+  color: #edf1e9;
+}
+
+.how-row small,
+.how-aside {
+  color: #88938b;
+}
+
+.how-aside span {
+  color: var(--green);
+}
+
+.site-footer {
+  color: #77827a;
+}
+
+.game-shell {
+  color: #f0f4ee;
+  background:
+    radial-gradient(ellipse at 92% 12%, rgba(100, 140, 76, 0.12), transparent 34%),
+    #111614;
+}
+
+.game-topbar {
+  height: 68px;
+  border-color: var(--line);
+  background: rgba(18, 24, 21, 0.88);
+  backdrop-filter: blur(16px);
+}
+
+.back-button,
+.give-up {
+  color: #aab5ac;
+}
+
+.back-button {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.back-button:hover {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.game-status {
+  color: #a7b2a8;
+}
+
+.give-up {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.give-up:hover {
+  color: #f3f5ef;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.game-layout {
+  gap: 17px;
+  padding: 18px 22px 16px;
+}
+
+.wiki-panel {
+  overflow: hidden;
+  border: 1px solid rgba(222, 235, 223, 0.13);
+  border-radius: 14px;
+  background: #fbfbf8;
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.22);
+}
+
+.browser-bar {
+  background: #f4f5f1;
+}
+
+.browser-address {
+  border-radius: 6px;
+}
+
+.reload-article {
+  width: 27px;
+  height: 27px;
+  border-radius: 7px;
+  transition: background 160ms ease;
+}
+
+.reload-article:hover,
+.browser-address button:hover {
+  background: #e8eae4;
+}
+
+.hud {
+  gap: 10px;
+}
+
+.hud-heading {
+  color: #c1cbc2;
+}
+
+.timer-card {
+  border: 1px solid rgba(222, 235, 223, 0.1);
+  border-radius: 13px;
+  padding: 17px 19px 15px;
+  background: linear-gradient(135deg, #253128, #1a211d 75%);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.045);
+}
+
+.timer-card::after {
+  color: rgba(194, 251, 98, 0.07);
+}
+
+.timer-label,
+.timer-foot {
+  color: #a9b5aa;
+}
+
+.timer {
+  color: var(--green);
+  text-shadow: 0 0 24px rgba(194, 251, 98, 0.13);
+}
+
+.goal-card,
+.stat-card,
+.route-card-small {
+  border: 1px solid rgba(222, 235, 223, 0.11);
+  border-radius: 11px;
+  background: rgba(30, 38, 33, 0.88);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.goal-card {
+  padding: 16px 17px 14px;
+}
+
+.goal-kicker,
+.stat-card > span,
+.route-small-title {
+  color: #a0aca2;
+}
+
+.goal-title,
+.stat-card strong {
+  color: #f0f4ed;
+}
+
+.goal-card > a {
+  border-color: rgba(222, 235, 223, 0.1);
+  color: var(--green);
+}
+
+.stat-card {
+  padding: 11px 13px;
+}
+
+.route-card-small {
+  padding: 13px 15px;
+}
+
+.route-small-title span,
+.route-card-small li b {
+  color: var(--green);
+}
+
+.route-card-small li:not(:last-child)::after {
+  background: rgba(222, 235, 223, 0.18);
+}
+
+.route-dot {
+  border-color: #7b897e;
+  background: #202822;
+}
+
+.start-dot {
+  background: var(--green);
+}
+
+.tip-card {
+  border: 1px solid rgba(194, 251, 98, 0.13);
+  border-radius: 10px;
+  background: rgba(194, 251, 98, 0.08);
+  color: #c4d1b8;
+}
+
+.tip-card > span {
+  color: var(--green);
+}
+
+.tip-card b {
+  color: #d4e4c0;
+}
+
+.new-game {
+  border-color: rgba(222, 235, 223, 0.15);
+  border-radius: 8px;
+  color: #c4cec5;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.new-game:hover {
+  border-color: rgba(194, 251, 98, 0.38);
+  background: rgba(194, 251, 98, 0.05);
+}
+
+.game-footer {
+  border-color: var(--line);
+  color: #78847b;
+}
+
+.article-error > span {
+  background: #eef4e6;
+}
+
+.result-overlay {
+  background: rgba(5, 9, 7, 0.76);
+  backdrop-filter: blur(9px);
+}
+
+.result-card {
+  overflow: hidden;
+  border: 1px solid rgba(222, 235, 223, 0.14);
+  border-radius: 18px;
+  background: linear-gradient(145deg, #202923, #171d19);
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.5);
+  color: #f0f4ee;
+}
+
+.result-card .eyebrow,
+.result-copy,
+.result-stats span,
+.text-button {
+  color: #a5b0a6;
+}
+
+.result-card h2 {
+  color: #f4f6f1;
+}
+
+.result-copy b {
+  color: var(--green);
+}
+
+.result-stats {
+  border-color: rgba(222, 235, 223, 0.13);
+}
+
+.result-stats strong {
+  color: #f3f6ef;
+}
+
+.result-close {
+  color: #b2bdb3;
+}
+
+.result-close:hover {
+  color: #fff;
+}
+
+.text-button:hover {
+  color: var(--green);
+}
+
+@media (max-width: 900px) {
+  .setup-shell {
+    padding-right: 5%;
+    padding-left: 5%;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(330px, 390px);
+  }
+}
+
+@media (max-width: 680px) {
+  .setup-shell {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .topbar {
+    height: 67px;
+  }
+
+  .hero {
+    gap: 30px;
+    padding-top: 47px;
+    padding-bottom: 42px;
+  }
+
+  .hero h1 {
+    font-size: clamp(66px, 16vw, 82px);
+    letter-spacing: -0.08em;
+  }
+
+  .route-card {
+    border-radius: 14px;
+    padding: 23px 20px 18px;
+  }
+
+  .how-row {
+    padding: 21px 5px;
+  }
+
+  .game-shell {
+    background: #111614;
+  }
+
+  .game-topbar {
+    padding-right: 11px;
+    padding-left: 10px;
+  }
+
+  .give-up {
+    padding: 8px;
+  }
+
+  .game-layout {
+    padding: 10px;
+  }
+
+  .hud {
+    gap: 7px;
+  }
+
+  .timer-card,
+  .goal-card,
+  .stat-card,
+  .route-card-small {
+    border-radius: 9px;
+  }
+
+  .wiki-panel {
+    border-radius: 11px;
+  }
+
+  .result-card {
+    border-radius: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-copy,
+  .route-card {
+    animation: enter-soft 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .route-card {
+    animation-delay: 80ms;
+  }
+
+  .timer-card,
+  .goal-card,
+  .stats-row,
+  .route-card-small,
+  .tip-card,
+  .new-game {
+    animation: enter-soft 420ms ease both;
+  }
+
+  @keyframes enter-soft {
+    from {
+      opacity: 0;
+      transform: translateY(9px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
