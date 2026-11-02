@@ -6,7 +6,7 @@ type WikiArticle = { title: string; html: string; url: string };
 type MultiplayerPlayer = { id: string; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number };
 type RoomPacket =
   | { type: 'join'; name: string }
-  | { type: 'room'; startTitle: string; targetTitle: string; language: string; players: MultiplayerPlayer[]; started: boolean; startsAt: number }
+  | { type: 'room'; hostId: string; startTitle: string; targetTitle: string; language: string; players: MultiplayerPlayer[]; started: boolean; startsAt: number }
   | { type: 'start'; startTitle: string; targetTitle: string; language: string; countdownMs: number }
   | { type: 'progress'; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number }
   | { type: 'finish'; winnerName: string; elapsedSeconds: number }
@@ -32,6 +32,7 @@ let hostConnection: DataConnection | null = null;
 let roomConnections = new Map<string, DataConnection>();
 let multiplayerPlayers = new Map<string, MultiplayerPlayer>();
 let roomCode = '';
+let roomHostId = '';
 let roomStarted = false;
 let roomStartsAt = 0;
 let startTimeout: number | undefined;
@@ -166,6 +167,7 @@ function createRoom() {
   currentPeer = peer;
   setupPeerEvents(peer);
   peer.on('open', (id) => {
+    roomHostId = id;
     multiplayerPlayers.set(id, { id, name: playerName, clicks: 0, article: '', finished: false, elapsedSeconds: 0 });
     peer.on('connection', (connection) => acceptRoomConnection(connection));
     renderRoomLobby();
@@ -239,7 +241,7 @@ function joinRoom(codeInput: string) {
 }
 
 function roomSnapshot(): RoomPacket {
-  return { type: 'room', startTitle, targetTitle, language, players: [...multiplayerPlayers.values()], started: roomStarted, startsAt: roomStartsAt };
+  return { type: 'room', hostId: roomHostId, startTitle, targetTitle, language, players: [...multiplayerPlayers.values()], started: roomStarted, startsAt: roomStartsAt };
 }
 
 function sendRoomSnapshot(connection: DataConnection) {
@@ -272,6 +274,7 @@ function handleRoomPacket(packet: RoomPacket) {
     return;
   }
   if (packet.type === 'room') {
+    roomHostId = packet.hostId;
     startTitle = packet.startTitle;
     targetTitle = packet.targetTitle;
     language = packet.language;
@@ -311,15 +314,15 @@ function renderRoomLobby() {
           <div class="card-top"><span class="card-label">KÓD MÍSTNOSTI</span><span class="route-icon">${isRoomHost ? 'HOST' : 'HRÁČ'}</span></div>
           <div class="room-code-display" id="room-code-display">${escapeHtml(roomCode)}</div>
           ${isRoomHost ? '<button class="mode-button mode-button-secondary copy-room-code" id="copy-room-code"><span>KOPÍROVAT KÓD</span></button>' : ''}
-          ${isRoomHost && !startTitle ? `<div class="room-route-editor">
-            <label class="field-label" for="room-start-input">STARTOVNÍ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol">◉</span><input id="room-start-input" autocomplete="off" placeholder="např. Praha"></div>
-            <label class="field-label" for="room-target-input">CÍLOVÝ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="room-target-input" autocomplete="off" placeholder="např. Měsíc"></div>
+          ${isRoomHost ? `<div class="room-route-editor">
+            <label class="field-label" for="room-start-input">STARTOVNÍ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol">◉</span><input id="room-start-input" autocomplete="off" placeholder="např. Praha" value="${escapeHtml(startTitle)}"></div>
+            <label class="field-label" for="room-target-input">CÍLOVÝ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="room-target-input" autocomplete="off" placeholder="např. Měsíc" value="${escapeHtml(targetTitle)}"></div>
             <div class="language-row"><span>JAZYK WIKIPEDIE</span><div class="language-switch"><button class="lang-choice${language === 'cs' ? ' active' : ''}" data-lang="cs">ČEŠTINA</button><button class="lang-choice${language === 'en' ? ' active' : ''}" data-lang="en">ENGLISH</button></div></div>
-            <button class="mode-button mode-button-secondary" id="save-room-route"><span>ULOŽIT TRASU</span></button>
+            <button class="mode-button mode-button-secondary" id="save-room-route"><span>${startTitle ? 'ULOŽIT ZMĚNY TRASY' : 'ULOŽIT TRASU'}</span></button>
             <p class="form-error" id="multiplayer-error" aria-live="polite"></p>
           </div>` : `<div class="room-route"><span>TRASA</span><strong>${escapeHtml(startTitle || 'Hostitel nastavuje trasu')}${targetTitle ? ` — ${escapeHtml(targetTitle)}` : ''}</strong><small>${language === 'cs' ? 'ČEŠTINA' : 'ANGLIČTINA'}</small></div>`}
           <div class="room-players-heading"><span class="card-label">HRÁČI</span><span class="room-player-count">${players.length} / 6</span></div>
-          <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === currentPeer?.id && isRoomHost ? ' · HOSTITEL' : ''}</span><span class="player-state">${player.finished ? 'CÍL' : player.clicks ? `${player.clicks} KLIKŮ` : 'PŘIPRAVEN'}</span>${isRoomHost && player.id !== currentPeer?.id ? `<button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
+          <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === roomHostId ? ' · HOSTITEL' : ''}</span><span class="player-state">${player.finished ? 'CÍL' : player.clicks ? `${player.clicks} KLIKŮ` : 'PŘIPRAVEN'}</span>${isRoomHost && player.id !== currentPeer?.id ? `<button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
           <p class="form-error room-status" id="room-status">${isRoomHost ? (!startTitle ? 'Nastav trasu a pozvi další hráče.' : players.length > 1 ? 'Všichni jsou připraveni.' : 'Čekám na další hráče…') : 'Připojování k hostiteli…'}</p>
           ${isRoomHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 || !startTitle || !targetTitle ? 'disabled' : ''}><span>START</span></button>` : '<div class="room-waiting">ČEKÁM, AŽ HOSTITEL ODSTARTUJE</div>'}
         </div>
@@ -618,6 +621,7 @@ function goHome() {
   isRoomHost = false;
   roomStarted = false;
   roomCode = '';
+  roomHostId = '';
   roomStartsAt = 0;
   raceWinner = '';
   raceWinnerTime = 0;
