@@ -350,8 +350,7 @@ function renderRoomLobby() {
   app.innerHTML = `
     <main class="setup-shell welcome-shell room-shell">
       <header class="topbar"><button class="back-button welcome-back" id="leave-room">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> ${isConnected ? 'V MÍSTNOSTI' : 'PŘIPOJOVÁNÍ'}</span></header>
-      <section class="hero welcome-hero room-hero">
-        <div class="hero-copy"><p class="eyebrow"><span>${escapeHtml(playerName)}</span> ONLINE ZÁVOD</p><h1>Všichni<br>na <em>start.</em></h1><p class="intro">Pošli kód ostatním. Jakmile se připojí, hostitel odstartuje společný závod.</p></div>
+      <section class="hero welcome-hero room-hero setup-hero-centered">
         <div class="route-card welcome-card room-card">
           <div class="card-top"><span class="card-label">KÓD MÍSTNOSTI</span><span class="room-role">${isRoomHost ? 'HOSTITEL' : 'HRÁČ'}</span></div>
           <div class="room-code-display" id="room-code-display">${escapeHtml(roomCode)}</div>

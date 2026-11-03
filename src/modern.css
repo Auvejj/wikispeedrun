@@ -183,6 +183,11 @@ input:focus-visible {
   grid-template-columns: minmax(0, 1fr) minmax(390px, 480px);
 }
 
+.room-shell .room-hero.setup-hero-centered {
+  grid-template-columns: minmax(0, 620px);
+  justify-content: center;
+}
+
 .room-card {
   gap: 11px;
 }
