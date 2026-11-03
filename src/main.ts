@@ -360,13 +360,12 @@ function renderRoomLobby() {
             <label class="field-label" for="room-start-input">STARTOVNÍ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol">◉</span><input id="room-start-input" autocomplete="off" placeholder="např. Praha" value="${escapeHtml(startDraft)}"></div>
             <label class="field-label" for="room-target-input">CÍLOVÝ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="room-target-input" autocomplete="off" placeholder="např. Měsíc" value="${escapeHtml(targetDraft)}"></div>
             <div class="language-row"><span>JAZYK WIKIPEDIE</span><div class="language-switch"><button class="lang-choice${language === 'cs' ? ' active' : ''}" data-lang="cs">ČEŠTINA</button><button class="lang-choice${language === 'en' ? ' active' : ''}" data-lang="en">ENGLISH</button></div></div>
-            <button class="mode-button mode-button-secondary" id="save-room-route"><span>${startTitle ? 'ULOŽIT ZMĚNY TRASY' : 'ULOŽIT TRASU'}</span></button>
             <p class="form-error" id="multiplayer-error" aria-live="polite"></p>
           </div>` : `<div class="room-route"><span>TRASA</span><strong>${escapeHtml(startTitle || 'Hostitel nastavuje trasu')}${targetTitle ? ` — ${escapeHtml(targetTitle)}` : ''}</strong><small>${language === 'cs' ? 'ČEŠTINA' : 'ANGLIČTINA'}</small></div>`}
           <div class="room-players-heading"><span class="card-label">HRÁČI</span><span class="room-player-count">${players.length} / ${ROOM_MAX_PLAYERS}</span></div>
           <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === roomHostId ? ' · HOSTITEL' : ''}</span><span class="player-state">${roomStarted && raceWinner ? (player.inLobby ? 'V LOBBY' : 'VÝSLEDEK') : player.ready ? 'PŘIPRAVEN/A' : 'ČEKÁ'}</span>${isRoomHost && player.id !== currentPeer?.id ? `<button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
           <p class="room-status" id="room-status">${waitingForReturns ? 'Počkej, až se všichni vrátí z výsledku.' : isRoomHost ? (!startTitle ? 'Nastav trasu a pozvi další hráče.' : players.length < 2 ? 'Čekám na další hráče…' : guestsReady ? 'Všichni jsou připraveni.' : 'Čekám, až se hráči připraví…') : roomStarted ? 'Do lobby ses vrátil/a. Čekám na ostatní…' : localIsReady ? 'Jsi připraven/a. Čekám na start hostitele.' : 'Až budeš připraven/a, klikni na tlačítko níže.'}</p>
-          ${isRoomHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 || !startTitle || !targetTitle || !guestsReady || roomStarted ? 'disabled' : ''}><span>START</span></button>` : `<button class="start-button mode-button" id="toggle-ready" ${waitingForReturns ? 'disabled' : ''}><span>${localIsReady ? 'ZRUŠIT PŘIPRAVENOST' : 'PŘIPRAVIT'}</span></button>`}
+          ${isRoomHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 || !guestsReady || roomStarted ? 'disabled' : ''}><span>START</span></button>` : `<button class="start-button mode-button" id="toggle-ready" ${waitingForReturns ? 'disabled' : ''}><span>${localIsReady ? 'ZRUŠIT PŘIPRAVENOST' : 'PŘIPRAVIT'}</span></button>`}
         </div>
       </section>
       <footer class="site-footer"><span>© WIKI SPRINT</span><span>HRÁČI SE PŘIPOJUJÍ PŘES PEER-TO-PEER</span></footer>
@@ -378,7 +377,6 @@ function renderRoomLobby() {
   });
   app.querySelector('#start-multiplayer')?.addEventListener('click', startMultiplayerRace);
   app.querySelector('#toggle-ready')?.addEventListener('click', toggleReady);
-  app.querySelector('#save-room-route')?.addEventListener('click', submitRoomRoute);
   app.querySelector('#random-route')?.addEventListener('click', () => { void chooseRandomRoute(); });
   app.querySelector<HTMLInputElement>('#room-start-input')?.addEventListener('input', (event) => { roomStartDraft = (event.currentTarget as HTMLInputElement).value; });
   app.querySelector<HTMLInputElement>('#room-target-input')?.addEventListener('input', (event) => { roomTargetDraft = (event.currentTarget as HTMLInputElement).value; });
@@ -387,23 +385,6 @@ function renderRoomLobby() {
     app.querySelectorAll('.lang-choice').forEach((choice) => choice.classList.toggle('active', choice === button));
   }));
   app.querySelectorAll<HTMLButtonElement>('.kick-player').forEach((button) => button.addEventListener('click', () => kickRoomPlayer(button.dataset.kick ?? '')));
-}
-
-function submitRoomRoute() {
-  const start = cleanTitle(app.querySelector<HTMLInputElement>('#room-start-input')?.value ?? '');
-  const target = cleanTitle(app.querySelector<HTMLInputElement>('#room-target-input')?.value ?? '');
-  if (!start || !target) { showMultiplayerError('Vyplň startovní i cílový článek.'); return; }
-  if (start.toLocaleLowerCase() === target.toLocaleLowerCase()) { showMultiplayerError('Start a cíl musí být dva různé články.'); return; }
-  startTitle = start;
-  targetTitle = target;
-  roomStartDraft = start;
-  roomTargetDraft = target;
-  route = [start];
-  multiplayerPlayers.forEach((player, id) => multiplayerPlayers.set(id, {
-    ...player, clicks: 0, article: start, finished: false, elapsedSeconds: 0, ready: false,
-  }));
-  renderRoomLobby();
-  broadcastRoomSnapshot();
 }
 
 async function chooseRandomRoute(startSelector = '#room-start-input', targetSelector = '#room-target-input', buttonSelector = '#random-route') {
@@ -455,7 +436,16 @@ function kickRoomPlayer(playerId: string) {
 
 function startMultiplayerRace() {
   const guestsReady = [...multiplayerPlayers.values()].filter((player) => player.id !== roomHostId).every((player) => player.ready);
-  if (!isRoomHost || multiplayerPlayers.size < 2 || !startTitle || !targetTitle || !guestsReady || roomStarted) return;
+  if (!isRoomHost || multiplayerPlayers.size < 2 || !guestsReady || roomStarted) return;
+  const start = cleanTitle(app.querySelector<HTMLInputElement>('#room-start-input')?.value ?? startTitle);
+  const target = cleanTitle(app.querySelector<HTMLInputElement>('#room-target-input')?.value ?? targetTitle);
+  if (!start || !target) { showMultiplayerError('Vyplň startovní i cílový článek.'); return; }
+  if (start.toLocaleLowerCase() === target.toLocaleLowerCase()) { showMultiplayerError('Start a cíl musí být dva různé články.'); return; }
+  startTitle = start;
+  targetTitle = target;
+  roomStartDraft = start;
+  roomTargetDraft = target;
+  route = [start];
   raceWinner = '';
   raceWinnerTime = 0;
   roomStarted = true;
