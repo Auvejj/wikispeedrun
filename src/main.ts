@@ -98,8 +98,7 @@ function renderMultiplayerIntro() {
   app.innerHTML = `
     <main class="setup-shell welcome-shell">
       <header class="topbar"><button class="back-button welcome-back" id="back-to-modes">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> MULTIPLAYER</span></header>
-      <section class="hero welcome-hero">
-        <div class="hero-copy"><p class="eyebrow"><span>ONLINE ZÁVOD</span> S OSTATNÍMI</p><h1>Najdi cestu<br><em>rychleji.</em></h1><p class="intro">Zadej přezdívku, vytvoř místnost a pošli její kód kamarádům. Nebo se připoj ke kódu, který už máš.</p></div>
+      <section class="hero welcome-hero setup-hero-centered">
         <div class="route-card welcome-card multiplayer-card">
           <div class="card-top welcome-card-top"></div>
           <label class="field-label" for="nickname-input">TVOJE PŘEZDÍVKA</label>
@@ -566,8 +565,7 @@ function renderRouteSetup() {
   app.innerHTML = `
     <main class="setup-shell">
       <header class="topbar"><button class="back-button welcome-back" id="back-to-modes">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> SINGLEPLAYER</span></header>
-      <section class="hero">
-        <div class="hero-copy"><p class="eyebrow"><span>01</span> WIKIPEDIE, ALE JAKO ZÁVOD</p><h1>Jak rychle<br>najdeš <em>cestu?</em></h1><p class="intro">Začni na jednom článku. Skonči na druhém. Mezitím se můžeš pohybovat jen po odkazech.</p></div>
+      <section class="hero setup-hero-centered">
         <div class="route-card">
           <div class="card-top welcome-card-top"></div>
           <button class="mode-button mode-button-secondary random-route-button" id="random-solo-route"><span>VYBRAT NÁHODNOU TRASU</span></button>

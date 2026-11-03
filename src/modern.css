@@ -98,6 +98,11 @@ input:focus-visible {
   flex: none;
 }
 
+.setup-hero-centered {
+  grid-template-columns: minmax(0, 620px);
+  justify-content: center;
+}
+
 .welcome-card .mode-heading {
   margin: 20px 0 10px;
 }
@@ -552,6 +557,23 @@ input:focus-visible {
 .back-button:hover {
   border-color: var(--line);
   background: rgba(255, 255, 255, 0.05);
+}
+
+.back-button.welcome-back {
+  min-width: 76px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(194, 251, 98, 0.42);
+  background: rgba(194, 251, 98, 0.08);
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.back-button.welcome-back:hover {
+  border-color: var(--green);
+  background: rgba(194, 251, 98, 0.15);
+  color: var(--green);
 }
 
 .game-status {
