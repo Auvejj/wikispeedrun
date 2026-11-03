@@ -569,7 +569,7 @@ function renderRouteSetup() {
       <section class="hero">
         <div class="hero-copy"><p class="eyebrow"><span>01</span> WIKIPEDIE, ALE JAKO ZÁVOD</p><h1>Jak rychle<br>najdeš <em>cestu?</em></h1><p class="intro">Začni na jednom článku. Skonči na druhém. Mezitím se můžeš pohybovat jen po odkazech.</p></div>
         <div class="route-card">
-          <div class="card-top"><span class="card-label">NASTAV SI TRASU</span><span class="route-icon">01</span></div>
+          <div class="card-top welcome-card-top"></div>
           <button class="mode-button mode-button-secondary random-route-button" id="random-solo-route"><span>VYBRAT NÁHODNOU TRASU</span></button>
           <label class="field-label" for="start-input">STARTOVNÍ ČLÁNEK</label>
           <div class="input-wrap"><span class="field-symbol">◉</span><input id="start-input" autocomplete="off" placeholder="např. Praha" required aria-required="true"></div>
