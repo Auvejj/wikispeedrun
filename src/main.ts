@@ -101,7 +101,7 @@ function renderMultiplayerIntro() {
       <section class="hero welcome-hero">
         <div class="hero-copy"><p class="eyebrow"><span>ONLINE ZÁVOD</span> S OSTATNÍMI</p><h1>Najdi cestu<br><em>rychleji.</em></h1><p class="intro">Zadej přezdívku, vytvoř místnost a pošli její kód kamarádům. Nebo se připoj ke kódu, který už máš.</p></div>
         <div class="route-card welcome-card multiplayer-card">
-          <div class="card-top"><span class="card-label">VYTVOŘIT ONLINE ZÁVOD</span><span class="route-icon">01</span></div>
+          <div class="card-top welcome-card-top"></div>
           <label class="field-label" for="nickname-input">TVOJE PŘEZDÍVKA</label>
           <div class="input-wrap"><span class="field-symbol">@</span><input id="nickname-input" autocomplete="nickname" maxlength="20" placeholder="např. dádyfousek" required aria-required="true" value="${escapeHtml(playerName)}"></div>
           <button class="start-button mode-button" id="create-room"><span>VYTVOŘIT MÍSTNOST</span></button>
