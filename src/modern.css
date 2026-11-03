@@ -403,6 +403,10 @@ input:focus-visible {
   margin-bottom: 27px;
 }
 
+.welcome-card-top {
+  display: none;
+}
+
 .route-icon {
   display: grid;
   width: 34px;

@@ -68,7 +68,7 @@ function renderWelcome() {
       <section class="hero welcome-hero">
         <div class="hero-copy"><p class="eyebrow"><span>WIKI SPRINT</span> ZÁVOD ZAČÍNÁ TADY</p><h1>Každý klik<br>je <em>nový směr.</em></h1><p class="intro">Vyber si, jestli se vydáš na cestu sám, nebo s ostatními.</p></div>
         <div class="route-card welcome-card">
-          <div class="card-top"><span class="card-label">JAK CHCEŠ HRÁT?</span><span class="route-icon">01</span></div>
+          <div class="card-top welcome-card-top"></div>
           <div class="mode-buttons"><button class="start-button mode-button" id="single-mode"><span>SINGLEPLAYER</span></button><button class="mode-button mode-button-secondary" id="multi-mode"><span>MULTIPLAYER</span></button></div>
           <button class="theme-toggle" id="theme-toggle" type="button"></button>
         </div>
