@@ -639,7 +639,7 @@ function renderGame() {
     if (timer) timer.textContent = formatTime(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
   }, 250);
   app.querySelector('#quit-game')!.addEventListener('click', () => confirmExit());
-  app.querySelector('#give-up')!.addEventListener('click', () => showResult(false));
+  app.querySelector('#give-up')!.addEventListener('click', () => confirmSurrender());
   app.querySelector('#new-game')!.addEventListener('click', () => confirmExit());
   app.querySelector('#reload-article')!.addEventListener('click', () => { if (currentTitle) void loadArticle(currentTitle, false); });
   app.querySelector('#open-original')!.addEventListener('click', () => window.open(wikiUrl(currentTitle || startTitle), '_blank', 'noopener,noreferrer'));
@@ -721,6 +721,22 @@ function confirmExit() {
   overlay.querySelector('#close-result')!.addEventListener('click', () => overlay.classList.add('hidden'));
   overlay.querySelector('#keep-playing')!.addEventListener('click', () => overlay.classList.add('hidden'));
   overlay.querySelector('#confirm-home')!.addEventListener('click', goHome);
+}
+
+function confirmSurrender() {
+  const overlay = app.querySelector<HTMLDivElement>('#result-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = `<div class="result-card confirm-card"><button id="close-result" class="result-close" aria-label="Zavřít">×</button><div class="result-symbol">✳</div><p class="eyebrow">VZDÁT ZÁVOD?</p><h2>Opravdu to chceš vzdát?</h2><p class="result-copy">Dosavadní čas a trasa se ukončí. Vrátíš se na nastavení singleplayeru.</p><button class="start-button" id="confirm-surrender"><span>VZDÁT A ZPĚT NA SINGLEPLAYER</span></button><button class="text-button" id="keep-playing">POKRAČOVAT VE HŘE</button></div>`;
+  overlay.querySelector('#close-result')!.addEventListener('click', () => overlay.classList.add('hidden'));
+  overlay.querySelector('#keep-playing')!.addEventListener('click', () => overlay.classList.add('hidden'));
+  overlay.querySelector('#confirm-surrender')!.addEventListener('click', () => {
+    if (timerId) window.clearInterval(timerId);
+    clicks = 0;
+    currentTitle = '';
+    route = [];
+    renderRouteSetup();
+  });
 }
 
 function goHome() {
