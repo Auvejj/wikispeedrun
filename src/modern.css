@@ -316,6 +316,23 @@ input:focus-visible {
   transition: background 150ms ease, border-color 150ms ease;
 }
 
+.transfer-host {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(194, 251, 98, 0.3);
+  border-radius: 7px;
+  background: rgba(194, 251, 98, 0.07);
+  color: var(--green);
+  font: 7px var(--mono);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.transfer-host:hover {
+  border-color: var(--green);
+  background: rgba(194, 251, 98, 0.14);
+}
+
 .kick-player:hover {
   border-color: rgba(245, 132, 116, 0.55);
   background: rgba(245, 132, 116, 0.14);

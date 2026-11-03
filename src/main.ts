@@ -6,6 +6,9 @@ type WikiArticle = { title: string; html: string; url: string };
 type MultiplayerPlayer = { id: string; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number; inLobby: boolean; ready: boolean };
 type RoomPacket =
   | { type: 'join'; name: string }
+  | { type: 'transfer-host'; playerId: string }
+  | { type: 'kick-request'; playerId: string }
+  | { type: 'start-request'; startTitle: string; targetTitle: string; language: string }
   | { type: 'room'; hostId: string; startTitle: string; targetTitle: string; language: string; players: MultiplayerPlayer[]; started: boolean; startsAt: number }
   | { type: 'start'; startTitle: string; targetTitle: string; language: string; countdownMs: number }
   | { type: 'progress'; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number }
@@ -211,6 +214,15 @@ function acceptRoomConnection(connection: DataConnection) {
       sendRoomSnapshot(connection);
       broadcastRoomSnapshot();
       renderRoomLobby();
+    } else if (packet.type === 'transfer-host' && connection.peer === roomHostId && multiplayerPlayers.has(packet.playerId)) {
+      roomHostId = packet.playerId;
+      multiplayerPlayers.forEach((player, id) => multiplayerPlayers.set(id, { ...player, ready: false }));
+      broadcastRoomSnapshot();
+      renderRoomLobby();
+    } else if (packet.type === 'kick-request' && connection.peer === roomHostId) {
+      kickRoomPlayer(packet.playerId);
+    } else if (packet.type === 'start-request' && connection.peer === roomHostId) {
+      startMultiplayerRace({ startTitle: packet.startTitle, targetTitle: packet.targetTitle, language: packet.language }, true);
     } else if (packet.type === 'progress') {
       const existing = multiplayerPlayers.get(connection.peer);
       if (!existing || raceWinner) return;
@@ -280,6 +292,10 @@ function roomSnapshot(): RoomPacket {
   return { type: 'room', hostId: roomHostId, startTitle, targetTitle, language, players: [...multiplayerPlayers.values()], started: roomStarted, startsAt: roomStartsAt };
 }
 
+function isLocalRoomHost() {
+  return Boolean(currentPeer?.id && currentPeer.id === roomHostId);
+}
+
 function sendRoomSnapshot(connection: DataConnection) {
   if (connection.open) connection.send(roomSnapshot());
 }
@@ -339,6 +355,7 @@ function handleRoomPacket(packet: RoomPacket) {
 }
 
 function renderRoomLobby() {
+  const localIsHost = isLocalRoomHost();
   const isConnected = isRoomHost || hostConnection?.open === true;
   const players = [...multiplayerPlayers.values()];
   const startDraft = roomStartDraft ?? startTitle;
@@ -352,10 +369,10 @@ function renderRoomLobby() {
       <header class="topbar"><button class="back-button welcome-back" id="leave-room">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> ${isConnected ? 'V MÍSTNOSTI' : 'PŘIPOJOVÁNÍ'}</span></header>
       <section class="hero welcome-hero room-hero setup-hero-centered">
         <div class="route-card welcome-card room-card">
-          <div class="card-top"><span class="card-label">KÓD MÍSTNOSTI</span><span class="room-role">${isRoomHost ? 'HOSTITEL' : 'HRÁČ'}</span></div>
+          <div class="card-top"><span class="card-label">KÓD MÍSTNOSTI</span><span class="room-role">${localIsHost ? 'HOSTITEL' : 'HRÁČ'}</span></div>
           <div class="room-code-display" id="room-code-display">${escapeHtml(roomCode)}</div>
-          ${isRoomHost ? '<button class="mode-button mode-button-secondary copy-room-code" id="copy-room-code"><span>KOPÍROVAT KÓD</span></button>' : ''}
-          ${isRoomHost && !roomStarted ? `<div class="room-route-editor">
+          ${localIsHost ? '<button class="mode-button mode-button-secondary copy-room-code" id="copy-room-code"><span>KOPÍROVAT KÓD</span></button>' : ''}
+          ${localIsHost && !roomStarted ? `<div class="room-route-editor">
             <button class="mode-button mode-button-secondary random-route-button" id="random-route"><span>VYBRAT NÁHODNOU TRASU</span></button>
             <label class="field-label" for="room-start-input">STARTOVNÍ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol">◉</span><input id="room-start-input" autocomplete="off" placeholder="např. Praha" value="${escapeHtml(startDraft)}"></div>
             <label class="field-label" for="room-target-input">CÍLOVÝ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="room-target-input" autocomplete="off" placeholder="např. Měsíc" value="${escapeHtml(targetDraft)}"></div>
@@ -363,9 +380,9 @@ function renderRoomLobby() {
             <p class="form-error" id="multiplayer-error" aria-live="polite"></p>
           </div>` : `<div class="room-route"><span>TRASA</span><strong>${escapeHtml(startTitle || 'Hostitel nastavuje trasu')}${targetTitle ? ` — ${escapeHtml(targetTitle)}` : ''}</strong><small>${language === 'cs' ? 'ČEŠTINA' : 'ANGLIČTINA'}</small></div>`}
           <div class="room-players-heading"><span class="card-label">HRÁČI</span><span class="room-player-count">${players.length} / ${ROOM_MAX_PLAYERS}</span></div>
-          <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === roomHostId ? ' · HOSTITEL' : ''}</span><span class="player-state">${roomStarted && raceWinner ? (player.inLobby ? 'V LOBBY' : 'VÝSLEDEK') : player.ready ? 'PŘIPRAVEN/A' : 'ČEKÁ'}</span>${isRoomHost && player.id !== currentPeer?.id ? `<button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
-          <p class="room-status" id="room-status">${waitingForReturns ? 'Počkej, až se všichni vrátí z výsledku.' : isRoomHost ? (!startTitle ? 'Nastav trasu a pozvi další hráče.' : players.length < 2 ? 'Čekám na další hráče…' : guestsReady ? 'Všichni jsou připraveni.' : 'Čekám, až se hráči připraví…') : roomStarted ? 'Do lobby ses vrátil/a. Čekám na ostatní…' : localIsReady ? 'Jsi připraven/a. Čekám na start hostitele.' : 'Až budeš připraven/a, klikni na tlačítko níže.'}</p>
-          ${isRoomHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 || !guestsReady || roomStarted ? 'disabled' : ''}><span>START</span></button>` : `<button class="start-button mode-button" id="toggle-ready" ${waitingForReturns ? 'disabled' : ''}><span>${localIsReady ? 'ZRUŠIT PŘIPRAVENOST' : 'PŘIPRAVIT'}</span></button>`}
+          <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === roomHostId ? ' · HOSTITEL' : ''}</span><span class="player-state">${roomStarted && raceWinner ? (player.inLobby ? 'V LOBBY' : 'VÝSLEDEK') : player.ready ? 'PŘIPRAVEN/A' : 'ČEKÁ'}</span>${localIsHost && player.id !== currentPeer?.id ? `<button class="transfer-host" data-transfer="${escapeHtml(player.id)}" aria-label="Předat hostitelství hráči ${escapeHtml(player.name)}">PŘEDAT HOSTA</button><button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
+          <p class="room-status" id="room-status">${waitingForReturns ? 'Počkej, až se všichni vrátí z výsledku.' : localIsHost ? (!startTitle ? 'Nastav trasu a pozvi další hráče.' : players.length < 2 ? 'Čekám na další hráče…' : guestsReady ? 'Všichni jsou připraveni.' : 'Čekám, až se hráči připraví…') : roomStarted ? 'Do lobby ses vrátil/a. Čekám na ostatní…' : localIsReady ? 'Jsi připraven/a. Čekám na start hostitele.' : 'Až budeš připraven/a, klikni na tlačítko níže.'}</p>
+          ${localIsHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 || !guestsReady || roomStarted ? 'disabled' : ''}><span>START</span></button>` : `<button class="start-button mode-button" id="toggle-ready" ${waitingForReturns ? 'disabled' : ''}><span>${localIsReady ? 'ZRUŠIT PŘIPRAVENOST' : 'PŘIPRAVIT'}</span></button>`}
         </div>
       </section>
       <footer class="site-footer"><span>© WIKI SPRINT</span><span>HRÁČI SE PŘIPOJUJÍ PŘES PEER-TO-PEER</span></footer>
@@ -385,6 +402,7 @@ function renderRoomLobby() {
     app.querySelectorAll('.lang-choice').forEach((choice) => choice.classList.toggle('active', choice === button));
   }));
   app.querySelectorAll<HTMLButtonElement>('.kick-player').forEach((button) => button.addEventListener('click', () => kickRoomPlayer(button.dataset.kick ?? '')));
+  app.querySelectorAll<HTMLButtonElement>('.transfer-host').forEach((button) => button.addEventListener('click', () => transferRoomHost(button.dataset.transfer ?? '')));
 }
 
 async function chooseRandomRoute(startSelector = '#room-start-input', targetSelector = '#room-target-input', buttonSelector = '#random-route') {
@@ -421,7 +439,8 @@ function setRouteDraft(start: string, target: string, startSelector = '#room-sta
 }
 
 function kickRoomPlayer(playerId: string) {
-  if (!isRoomHost || !playerId) return;
+  if ((!isRoomHost && !isLocalRoomHost()) || !playerId) return;
+  if (!isRoomHost) { hostConnection?.send({ type: 'kick-request', playerId }); return; }
   const connection = roomConnections.get(playerId);
   connection?.send({ type: 'kicked', message: 'Hostitel tě odebral z místnosti.' });
   window.setTimeout(() => connection?.close(), 100);
@@ -434,15 +453,29 @@ function kickRoomPlayer(playerId: string) {
   }
 }
 
-function startMultiplayerRace() {
+function transferRoomHost(playerId: string) {
+  if (!isLocalRoomHost() || !playerId || !multiplayerPlayers.has(playerId)) return;
+  if (!isRoomHost) { hostConnection?.send({ type: 'transfer-host', playerId }); return; }
+  roomHostId = playerId;
+  multiplayerPlayers.forEach((player, id) => multiplayerPlayers.set(id, { ...player, ready: false }));
+  broadcastRoomSnapshot();
+  renderRoomLobby();
+}
+
+function startMultiplayerRace(routeSelection?: { startTitle: string; targetTitle: string; language: string }, fromCoordinator = false) {
   const guestsReady = [...multiplayerPlayers.values()].filter((player) => player.id !== roomHostId).every((player) => player.ready);
-  if (!isRoomHost || multiplayerPlayers.size < 2 || !guestsReady || roomStarted) return;
-  const start = cleanTitle(app.querySelector<HTMLInputElement>('#room-start-input')?.value ?? startTitle);
-  const target = cleanTitle(app.querySelector<HTMLInputElement>('#room-target-input')?.value ?? targetTitle);
+  if ((!isLocalRoomHost() && !(isRoomHost && fromCoordinator)) || multiplayerPlayers.size < 2 || !guestsReady || roomStarted) return;
+  const start = cleanTitle(routeSelection?.startTitle ?? app.querySelector<HTMLInputElement>('#room-start-input')?.value ?? startTitle);
+  const target = cleanTitle(routeSelection?.targetTitle ?? app.querySelector<HTMLInputElement>('#room-target-input')?.value ?? targetTitle);
   if (!start || !target) { showMultiplayerError('Vyplň startovní i cílový článek.'); return; }
   if (start.toLocaleLowerCase() === target.toLocaleLowerCase()) { showMultiplayerError('Start a cíl musí být dva různé články.'); return; }
+  if (!isRoomHost) {
+    hostConnection?.send({ type: 'start-request', startTitle: start, targetTitle: target, language });
+    return;
+  }
   startTitle = start;
   targetTitle = target;
+  language = routeSelection?.language ?? language;
   roomStartDraft = start;
   roomTargetDraft = target;
   route = [start];
