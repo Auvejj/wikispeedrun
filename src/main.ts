@@ -3,12 +3,13 @@ import './modern.css';
 import { Peer, type DataConnection } from 'peerjs';
 
 type WikiArticle = { title: string; html: string; url: string };
-type MultiplayerPlayer = { id: string; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number };
+type MultiplayerPlayer = { id: string; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number; inLobby: boolean; ready: boolean };
 type RoomPacket =
   | { type: 'join'; name: string }
   | { type: 'room'; hostId: string; startTitle: string; targetTitle: string; language: string; players: MultiplayerPlayer[]; started: boolean; startsAt: number }
   | { type: 'start'; startTitle: string; targetTitle: string; language: string; countdownMs: number }
   | { type: 'progress'; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number }
+  | { type: 'ready'; ready: boolean }
   | { type: 'finish'; winnerName: string; elapsedSeconds: number }
   | { type: 'return-lobby' }
   | { type: 'kicked'; message: string }
@@ -168,7 +169,7 @@ function createRoom() {
   setupPeerEvents(peer);
   peer.on('open', (id) => {
     roomHostId = id;
-    multiplayerPlayers.set(id, { id, name: playerName, clicks: 0, article: '', finished: false, elapsedSeconds: 0 });
+    multiplayerPlayers.set(id, { id, name: playerName, clicks: 0, article: '', finished: false, elapsedSeconds: 0, inLobby: true, ready: false });
     peer.on('connection', (connection) => acceptRoomConnection(connection));
     renderRoomLobby();
   });
@@ -184,7 +185,7 @@ function acceptRoomConnection(connection: DataConnection) {
         connection.close();
         return;
       }
-      multiplayerPlayers.set(connection.peer, { id: connection.peer, name: packet.name.slice(0, 20), clicks: 0, article: startTitle, finished: false, elapsedSeconds: 0 });
+      multiplayerPlayers.set(connection.peer, { id: connection.peer, name: packet.name.slice(0, 20), clicks: 0, article: startTitle, finished: false, elapsedSeconds: 0, inLobby: true, ready: false });
       sendRoomSnapshot(connection);
       broadcastRoomSnapshot();
       renderRoomLobby();
@@ -198,15 +199,27 @@ function acceptRoomConnection(connection: DataConnection) {
         return;
       }
       broadcastRoomSnapshot();
+    } else if (packet.type === 'ready') {
+      const player = multiplayerPlayers.get(connection.peer);
+      if (!player || roomStarted) return;
+      multiplayerPlayers.set(connection.peer, { ...player, ready: packet.ready });
+      broadcastRoomSnapshot();
+      renderRoomLobby();
     } else if (packet.type === 'return-lobby' && isRoomHost) {
-      resetRaceToLobby();
+      const player = multiplayerPlayers.get(connection.peer);
+      if (!player || !raceWinner) return;
+      multiplayerPlayers.set(connection.peer, { ...player, inLobby: true, ready: false });
+      syncLobbyReturns();
     }
   });
   connection.on('close', () => {
     roomConnections.delete(connection.peer);
     multiplayerPlayers.delete(connection.peer);
-    broadcastRoomSnapshot();
-    if (!roomStarted) renderRoomLobby();
+    if (raceWinner) syncLobbyReturns();
+    else {
+      broadcastRoomSnapshot();
+      if (!roomStarted) renderRoomLobby();
+    }
   });
 }
 
@@ -231,7 +244,7 @@ function joinRoom(codeInput: string) {
     hostConnection = connection;
     connection.on('open', () => {
       connection.send({ type: 'join', name: playerName });
-      multiplayerPlayers.set(peer.id, { id: peer.id, name: playerName, clicks: 0, article: '', finished: false, elapsedSeconds: 0 });
+      multiplayerPlayers.set(peer.id, { id: peer.id, name: playerName, clicks: 0, article: '', finished: false, elapsedSeconds: 0, inLobby: true, ready: false });
       renderRoomLobby();
     });
     connection.on('data', (data) => handleRoomPacket(data as RoomPacket));
@@ -284,11 +297,9 @@ function handleRoomPacket(packet: RoomPacket) {
     if (!roomStarted) {
       raceWinner = '';
       renderRoomLobby();
+    } else if (raceWinner && multiplayerPlayers.get(currentPeer?.id ?? '')?.inLobby) {
+      renderRoomLobby();
     }
-    return;
-  }
-  if (packet.type === 'return-lobby') {
-    resetRaceToLobby();
     return;
   }
   if (packet.type === 'start') {
@@ -296,6 +307,7 @@ function handleRoomPacket(packet: RoomPacket) {
     targetTitle = packet.targetTitle;
     language = packet.language;
     roomStarted = true;
+    multiplayerPlayers.forEach((player, id) => multiplayerPlayers.set(id, { ...player, inLobby: false, ready: false }));
     roomStartsAt = Date.now() + packet.countdownMs;
     window.clearTimeout(startTimeout);
     startTimeout = window.setTimeout(beginMultiplayerGame, packet.countdownMs);
@@ -305,16 +317,20 @@ function handleRoomPacket(packet: RoomPacket) {
 function renderRoomLobby() {
   const isConnected = isRoomHost || hostConnection?.open === true;
   const players = [...multiplayerPlayers.values()];
+  const guestsReady = players.filter((player) => player.id !== roomHostId).every((player) => player.ready);
+  const localPlayer = multiplayerPlayers.get(currentPeer?.id ?? '');
+  const localIsReady = localPlayer?.ready ?? false;
+  const waitingForReturns = roomStarted && Boolean(raceWinner);
   app.innerHTML = `
     <main class="setup-shell welcome-shell room-shell">
       <header class="topbar"><button class="back-button welcome-back" id="leave-room">ZPĚT</button><a class="brand" href="#"><span class="brand-mark">W</span> wiki<span class="brand-light">sprint</span></a><span class="top-note"><i></i> ${isConnected ? 'V MÍSTNOSTI' : 'PŘIPOJOVÁNÍ'}</span></header>
       <section class="hero welcome-hero room-hero">
         <div class="hero-copy"><p class="eyebrow"><span>${escapeHtml(playerName)}</span> ONLINE ZÁVOD</p><h1>Všichni<br>na <em>start.</em></h1><p class="intro">Pošli kód ostatním. Jakmile se připojí, hostitel odstartuje společný závod.</p></div>
         <div class="route-card welcome-card room-card">
-          <div class="card-top"><span class="card-label">KÓD MÍSTNOSTI</span><span class="route-icon">${isRoomHost ? 'HOST' : 'HRÁČ'}</span></div>
+          <div class="card-top"><span class="card-label">KÓD MÍSTNOSTI</span><span class="room-role">${isRoomHost ? 'HOSTITEL' : 'HRÁČ'}</span></div>
           <div class="room-code-display" id="room-code-display">${escapeHtml(roomCode)}</div>
           ${isRoomHost ? '<button class="mode-button mode-button-secondary copy-room-code" id="copy-room-code"><span>KOPÍROVAT KÓD</span></button>' : ''}
-          ${isRoomHost ? `<div class="room-route-editor">
+          ${isRoomHost && !roomStarted ? `<div class="room-route-editor">
             <label class="field-label" for="room-start-input">STARTOVNÍ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol">◉</span><input id="room-start-input" autocomplete="off" placeholder="např. Praha" value="${escapeHtml(startTitle)}"></div>
             <label class="field-label" for="room-target-input">CÍLOVÝ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="room-target-input" autocomplete="off" placeholder="např. Měsíc" value="${escapeHtml(targetTitle)}"></div>
             <div class="language-row"><span>JAZYK WIKIPEDIE</span><div class="language-switch"><button class="lang-choice${language === 'cs' ? ' active' : ''}" data-lang="cs">ČEŠTINA</button><button class="lang-choice${language === 'en' ? ' active' : ''}" data-lang="en">ENGLISH</button></div></div>
@@ -322,9 +338,9 @@ function renderRoomLobby() {
             <p class="form-error" id="multiplayer-error" aria-live="polite"></p>
           </div>` : `<div class="room-route"><span>TRASA</span><strong>${escapeHtml(startTitle || 'Hostitel nastavuje trasu')}${targetTitle ? ` — ${escapeHtml(targetTitle)}` : ''}</strong><small>${language === 'cs' ? 'ČEŠTINA' : 'ANGLIČTINA'}</small></div>`}
           <div class="room-players-heading"><span class="card-label">HRÁČI</span><span class="room-player-count">${players.length} / 6</span></div>
-          <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === roomHostId ? ' · HOSTITEL' : ''}</span><span class="player-state">${player.finished ? 'CÍL' : player.clicks ? `${player.clicks} KLIKŮ` : 'PŘIPRAVEN'}</span>${isRoomHost && player.id !== currentPeer?.id ? `<button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
-          <p class="form-error room-status" id="room-status">${isRoomHost ? (!startTitle ? 'Nastav trasu a pozvi další hráče.' : players.length > 1 ? 'Všichni jsou připraveni.' : 'Čekám na další hráče…') : 'Připojování k hostiteli…'}</p>
-          ${isRoomHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 || !startTitle || !targetTitle ? 'disabled' : ''}><span>START</span></button>` : '<div class="room-waiting">ČEKÁM, AŽ HOSTITEL ODSTARTUJE</div>'}
+          <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === roomHostId ? ' · HOSTITEL' : ''}</span><span class="player-state">${roomStarted && raceWinner ? (player.inLobby ? 'V LOBBY' : 'VÝSLEDEK') : player.ready ? 'PŘIPRAVEN/A' : 'ČEKÁ'}</span>${isRoomHost && player.id !== currentPeer?.id ? `<button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
+          <p class="room-status" id="room-status">${waitingForReturns ? 'Počkej, až se všichni vrátí z výsledku.' : isRoomHost ? (!startTitle ? 'Nastav trasu a pozvi další hráče.' : players.length < 2 ? 'Čekám na další hráče…' : guestsReady ? 'Všichni jsou připraveni.' : 'Čekám, až se hráči připraví…') : roomStarted ? 'Do lobby ses vrátil/a. Čekám na ostatní…' : localIsReady ? 'Jsi připraven/a. Čekám na start hostitele.' : 'Až budeš připraven/a, klikni na tlačítko níže.'}</p>
+          ${isRoomHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 || !startTitle || !targetTitle || !guestsReady || roomStarted ? 'disabled' : ''}><span>START</span></button>` : `<button class="start-button mode-button" id="toggle-ready" ${waitingForReturns ? 'disabled' : ''}><span>${localIsReady ? 'ZRUŠIT PŘIPRAVENOST' : 'PŘIPRAVIT'}</span></button>`}
         </div>
       </section>
       <footer class="site-footer"><span>© WIKI SPRINT</span><span>HRÁČI SE PŘIPOJUJÍ PŘES PEER-TO-PEER</span></footer>
@@ -335,6 +351,7 @@ function renderRoomLobby() {
     void navigator.clipboard.writeText(roomCode).then(() => showMultiplayerError('Kód místnosti zkopírován.')).catch(() => showMultiplayerError(`Kód místnosti: ${roomCode}`));
   });
   app.querySelector('#start-multiplayer')?.addEventListener('click', startMultiplayerRace);
+  app.querySelector('#toggle-ready')?.addEventListener('click', toggleReady);
   app.querySelector('#save-room-route')?.addEventListener('click', submitRoomRoute);
   app.querySelectorAll<HTMLButtonElement>('.lang-choice').forEach((button) => button.addEventListener('click', () => {
     language = button.dataset.lang ?? 'cs';
@@ -352,7 +369,7 @@ function submitRoomRoute() {
   targetTitle = target;
   route = [start];
   multiplayerPlayers.forEach((player, id) => multiplayerPlayers.set(id, {
-    ...player, clicks: 0, article: start, finished: false, elapsedSeconds: 0,
+    ...player, clicks: 0, article: start, finished: false, elapsedSeconds: 0, ready: false,
   }));
   renderRoomLobby();
   broadcastRoomSnapshot();
@@ -365,15 +382,20 @@ function kickRoomPlayer(playerId: string) {
   window.setTimeout(() => connection?.close(), 100);
   roomConnections.delete(playerId);
   multiplayerPlayers.delete(playerId);
-  broadcastRoomSnapshot();
-  renderRoomLobby();
+  if (raceWinner) syncLobbyReturns();
+  else {
+    broadcastRoomSnapshot();
+    renderRoomLobby();
+  }
 }
 
 function startMultiplayerRace() {
-  if (!isRoomHost || multiplayerPlayers.size < 2) return;
+  const guestsReady = [...multiplayerPlayers.values()].filter((player) => player.id !== roomHostId).every((player) => player.ready);
+  if (!isRoomHost || multiplayerPlayers.size < 2 || !startTitle || !targetTitle || !guestsReady || roomStarted) return;
   raceWinner = '';
   raceWinnerTime = 0;
   roomStarted = true;
+  multiplayerPlayers.forEach((player, id) => multiplayerPlayers.set(id, { ...player, inLobby: false, ready: false }));
   roomStartsAt = Date.now() + 3000;
   const packet: RoomPacket = { type: 'start', startTitle, targetTitle, language, countdownMs: 3000 };
   roomConnections.forEach((connection) => { if (connection.open) connection.send(packet); });
@@ -399,6 +421,8 @@ function reportMultiplayerProgress(article: string) {
     article,
     finished: article.toLocaleLowerCase() === targetTitle.toLocaleLowerCase(),
     elapsedSeconds: Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
+    inLobby: false,
+    ready: false,
   };
   if (isRoomHost) {
     multiplayerPlayers.set(player.id, player);
@@ -410,6 +434,16 @@ function reportMultiplayerProgress(article: string) {
   } else {
     hostConnection?.send({ type: 'progress', name: player.name, clicks: player.clicks, article: player.article, finished: player.finished, elapsedSeconds: player.elapsedSeconds });
   }
+}
+
+function toggleReady() {
+  if (roomStarted || !currentPeer) return;
+  const player = multiplayerPlayers.get(currentPeer.id);
+  if (!player) return;
+  const ready = !player.ready;
+  multiplayerPlayers.set(currentPeer.id, { ...player, ready });
+  hostConnection?.send({ type: 'ready', ready });
+  renderRoomLobby();
 }
 
 function finishMultiplayerRace(winnerName: string, elapsedSeconds: number) {
@@ -428,23 +462,35 @@ function showMultiplayerWinner() {
   overlay.classList.remove('hidden');
   overlay.innerHTML = `<div class="result-card multiplayer-result"><div class="result-symbol">✳</div><p class="eyebrow">ZÁVOD UKONČEN</p><h2>${escapeHtml(raceWinner)} vyhrál/a!</h2><p class="result-copy">${escapeHtml(raceWinner)} dorazil/a do cíle jako první.</p><div class="result-stats"><div><span>VÍTĚZŮV ČAS</span><strong>${formatTime(raceWinnerTime)}</strong></div><div><span>CÍL</span><strong class="winner-goal">${escapeHtml(targetTitle)}</strong></div></div><button class="start-button" id="return-to-lobby"><span>ZPĚT DO LOBBY</span></button></div>`;
   overlay.querySelector('#return-to-lobby')!.addEventListener('click', () => {
-    if (isRoomHost) resetRaceToLobby();
-    else hostConnection?.send({ type: 'return-lobby' });
+    returnPlayerToLobby();
   });
 }
 
-function resetRaceToLobby() {
+function returnPlayerToLobby() {
+  if (!currentPeer || !raceWinner) return;
+  const player = multiplayerPlayers.get(currentPeer.id);
+  if (player) multiplayerPlayers.set(currentPeer.id, { ...player, inLobby: true, ready: false });
+  if (isRoomHost) syncLobbyReturns();
+  else {
+    hostConnection?.send({ type: 'return-lobby' });
+    renderRoomLobby();
+  }
+}
+
+function syncLobbyReturns() {
   if (!isRoomHost) return;
-  if (timerId) window.clearInterval(timerId);
-  roomStarted = false;
-  raceWinner = '';
-  raceWinnerTime = 0;
-  clicks = 0;
-  currentTitle = '';
-  route = [startTitle];
-  multiplayerPlayers.forEach((player, id) => multiplayerPlayers.set(id, {
-    ...player, clicks: 0, article: startTitle, finished: false, elapsedSeconds: 0,
-  }));
+  if (multiplayerPlayers.size && [...multiplayerPlayers.values()].every((player) => player.inLobby)) {
+    if (timerId) window.clearInterval(timerId);
+    roomStarted = false;
+    raceWinner = '';
+    raceWinnerTime = 0;
+    clicks = 0;
+    currentTitle = '';
+    route = [startTitle];
+    multiplayerPlayers.forEach((player, id) => multiplayerPlayers.set(id, {
+      ...player, clicks: 0, article: startTitle, finished: false, elapsedSeconds: 0, inLobby: true, ready: false,
+    }));
+  }
   broadcastRoomSnapshot();
   renderRoomLobby();
 }

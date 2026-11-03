@@ -186,6 +186,17 @@ input:focus-visible {
   margin-bottom: 3px;
 }
 
+.room-role {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--green);
+  font: 9px var(--mono);
+  letter-spacing: 0.1em;
+}
+
 .room-code-display {
   padding: 12px 10px 15px;
   border-bottom: 1px solid var(--line);
