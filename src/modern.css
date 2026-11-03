@@ -184,12 +184,33 @@ input:focus-visible {
 }
 
 .room-shell .room-hero.setup-hero-centered {
-  grid-template-columns: minmax(260px, 1fr) minmax(390px, 480px);
+  grid-template-columns: minmax(0, 1040px);
   justify-content: center;
   align-items: start;
   max-width: 1040px;
   margin-right: auto;
   margin-left: auto;
+}
+
+.room-lobby-panel {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.78fr) minmax(390px, 1fr);
+  align-items: start;
+  gap: clamp(24px, 4vw, 54px);
+  width: 100%;
+  padding: clamp(22px, 3vw, 40px);
+  border: 1px solid rgba(224, 238, 225, 0.13);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(31, 40, 35, 0.96), rgba(23, 30, 27, 0.96));
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.27), inset 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.room-lobby-panel .room-card {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .room-card {
@@ -269,11 +290,12 @@ input:focus-visible {
 
 .leaderboard {
   margin: 0;
-  padding: 22px;
-  border: 1px solid rgba(194, 251, 98, 0.16);
-  border-radius: 17px;
-  background: linear-gradient(145deg, rgba(31, 40, 35, 0.96), rgba(23, 30, 27, 0.96));
-  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.2), inset 0 1px rgba(255, 255, 255, 0.035);
+  padding: 10px 22px 10px 0;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .leaderboard-heading {
@@ -967,6 +989,16 @@ input:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .room-lobby-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .room-lobby-panel .leaderboard {
+    padding: 0 0 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
   .players-card {
     grid-column: 1 / -1;
   }
@@ -1153,6 +1185,12 @@ body.theme-light .eyebrow span {
 }
 
 body.theme-light .route-card {
+  border-color: rgba(50, 66, 53, 0.13);
+  background: linear-gradient(145deg, #fff, #f8faf5);
+  box-shadow: 0 20px 55px rgba(32, 45, 31, 0.09);
+}
+
+body.theme-light .room-lobby-panel {
   border-color: rgba(50, 66, 53, 0.13);
   background: linear-gradient(145deg, #fff, #f8faf5);
   box-shadow: 0 20px 55px rgba(32, 45, 31, 0.09);
