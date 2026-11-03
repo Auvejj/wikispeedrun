@@ -16,6 +16,11 @@ type RoomPacket =
   | { type: 'error'; message: string };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
+const ROOM_MAX_PLAYERS = 30;
+const randomArticles: { cs: string[]; en: string[] } = {
+  cs: ['Praha', 'Měsíc', 'Karel IV.', 'Vltava', 'Slunce', 'Eiffelova věž', 'Pes', 'Fotbal', 'Saturn', 'Albert Einstein', 'Japonsko', 'Amazonka', 'Česká republika', 'Leonardo da Vinci', 'Oceán'],
+  en: ['Prague', 'Moon', 'Charles IV, Holy Roman Emperor', 'Vltava', 'Sun', 'Eiffel Tower', 'Dog', 'Association football', 'Saturn', 'Albert Einstein', 'Japan', 'Amazon River', 'Czech Republic', 'Leonardo da Vinci', 'Ocean'],
+};
 let currentTitle = '';
 let startTitle = '';
 let targetTitle = '';
@@ -40,6 +45,9 @@ let startTimeout: number | undefined;
 let raceWinner = '';
 let raceWinnerTime = 0;
 let noticeTimeout: number | undefined;
+let roomStartDraft: string | null = null;
+let roomTargetDraft: string | null = null;
+let selectedTheme: 'light' | 'dark' = 'light';
 
 function wikiUrl(title: string) {
   return `https://${language}.wikipedia.org/wiki/${encodeURIComponent(title.replaceAll(' ', '_'))}`;
@@ -82,14 +90,14 @@ function renderMultiplayerIntro() {
         <div class="route-card welcome-card multiplayer-card">
           <div class="card-top"><span class="card-label">VYTVOŘIT ONLINE ZÁVOD</span><span class="route-icon">01</span></div>
           <label class="field-label" for="nickname-input">TVOJE PŘEZDÍVKA</label>
-          <div class="input-wrap"><span class="field-symbol">@</span><input id="nickname-input" autocomplete="nickname" maxlength="20" placeholder="např. Alex" required aria-required="true" value="${escapeHtml(playerName)}"></div>
+          <div class="input-wrap"><span class="field-symbol">@</span><input id="nickname-input" autocomplete="nickname" maxlength="20" placeholder="např. dádyfousek" required aria-required="true" value="${escapeHtml(playerName)}"></div>
           <button class="start-button mode-button" id="create-room"><span>VYTVOŘIT MÍSTNOST</span></button>
           <div class="room-divider"><span>NEBO SE PŘIPOJ</span></div>
           <label class="field-label" for="room-code-input">KÓD MÍSTNOSTI</label>
           <div class="input-wrap"><span class="field-symbol room-code-symbol">#</span><input id="room-code-input" autocomplete="one-time-code" inputmode="numeric" maxlength="4" placeholder="např. 4827" aria-label="Čtyřmístný kód místnosti"></div>
           <button class="mode-button mode-button-secondary" id="join-room"><span>PŘIPOJIT SE</span></button>
           <p class="form-error" id="multiplayer-error" aria-live="polite"></p>
-          <p class="microcopy">Až šest hráčů v jedné místnosti.</p>
+          <p class="microcopy">Až ${ROOM_MAX_PLAYERS} hráčů v jedné místnosti.</p>
         </div>
       </section>
       <footer class="site-footer"><span>© WIKI SPRINT</span><span>PŘIHLÁŠEN/A JAKO ${escapeHtml(playerName.toLocaleUpperCase())}</span></footer>
@@ -131,7 +139,7 @@ function newRoomCode() {
 }
 
 function showMultiplayerError(message: string) {
-  const error = app.querySelector<HTMLElement>('#multiplayer-error, #room-status');
+  const error = app.querySelector<HTMLElement>('#multiplayer-error, #room-status, #form-error');
   if (!error) return;
   window.clearTimeout(noticeTimeout);
   error.textContent = message;
@@ -159,6 +167,8 @@ function createRoom() {
   isRoomHost = true;
   roomStarted = false;
   roomCode = newRoomCode();
+  roomStartDraft = null;
+  roomTargetDraft = null;
   route = [];
   multiplayerPlayers.clear();
   app.querySelector<HTMLButtonElement>('#create-room')!.disabled = true;
@@ -180,8 +190,8 @@ function acceptRoomConnection(connection: DataConnection) {
   connection.on('data', (data) => {
     const packet = data as RoomPacket;
     if (packet.type === 'join') {
-      if (roomStarted || multiplayerPlayers.size >= 6 || [...multiplayerPlayers.values()].some((player) => player.name === packet.name.slice(0, 20))) {
-        connection.send({ type: 'error', message: roomStarted ? 'Závod už začal. Počkej na další místnost.' : [...multiplayerPlayers.values()].some((player) => player.name === packet.name.slice(0, 20)) ? 'Tato přezdívka už v místnosti je.' : 'Místnost je plná (maximálně 6 hráčů).' });
+      if (roomStarted || multiplayerPlayers.size >= ROOM_MAX_PLAYERS || [...multiplayerPlayers.values()].some((player) => player.name === packet.name.slice(0, 20))) {
+        connection.send({ type: 'error', message: roomStarted ? 'Závod už začal. Počkej na další místnost.' : [...multiplayerPlayers.values()].some((player) => player.name === packet.name.slice(0, 20)) ? 'Tato přezdívka už v místnosti je.' : `Místnost je plná (maximálně ${ROOM_MAX_PLAYERS} hráčů).` });
         connection.close();
         return;
       }
@@ -231,6 +241,7 @@ function joinRoom(codeInput: string) {
   targetTitle = '';
   isMultiplayer = true;
   isRoomHost = false;
+  roomHostId = '';
   roomStarted = false;
   multiplayerPlayers.clear();
   app.querySelector<HTMLButtonElement>('#join-room')!.disabled = true;
@@ -274,6 +285,7 @@ function handleRoomPacket(packet: RoomPacket) {
     currentPeer = null;
     hostConnection = null;
     roomCode = '';
+    roomHostId = '';
     isMultiplayer = false;
     renderMultiplayerIntro();
     showMultiplayerError(packet.message);
@@ -317,6 +329,8 @@ function handleRoomPacket(packet: RoomPacket) {
 function renderRoomLobby() {
   const isConnected = isRoomHost || hostConnection?.open === true;
   const players = [...multiplayerPlayers.values()];
+  const startDraft = roomStartDraft ?? startTitle;
+  const targetDraft = roomTargetDraft ?? targetTitle;
   const guestsReady = players.filter((player) => player.id !== roomHostId).every((player) => player.ready);
   const localPlayer = multiplayerPlayers.get(currentPeer?.id ?? '');
   const localIsReady = localPlayer?.ready ?? false;
@@ -331,13 +345,14 @@ function renderRoomLobby() {
           <div class="room-code-display" id="room-code-display">${escapeHtml(roomCode)}</div>
           ${isRoomHost ? '<button class="mode-button mode-button-secondary copy-room-code" id="copy-room-code"><span>KOPÍROVAT KÓD</span></button>' : ''}
           ${isRoomHost && !roomStarted ? `<div class="room-route-editor">
-            <label class="field-label" for="room-start-input">STARTOVNÍ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol">◉</span><input id="room-start-input" autocomplete="off" placeholder="např. Praha" value="${escapeHtml(startTitle)}"></div>
-            <label class="field-label" for="room-target-input">CÍLOVÝ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="room-target-input" autocomplete="off" placeholder="např. Měsíc" value="${escapeHtml(targetTitle)}"></div>
+            <button class="mode-button mode-button-secondary random-route-button" id="random-route"><span>VYBRAT NÁHODNOU TRASU</span></button>
+            <label class="field-label" for="room-start-input">STARTOVNÍ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol">◉</span><input id="room-start-input" autocomplete="off" placeholder="např. Praha" value="${escapeHtml(startDraft)}"></div>
+            <label class="field-label" for="room-target-input">CÍLOVÝ ČLÁNEK</label><div class="input-wrap"><span class="field-symbol target-symbol">◎</span><input id="room-target-input" autocomplete="off" placeholder="např. Měsíc" value="${escapeHtml(targetDraft)}"></div>
             <div class="language-row"><span>JAZYK WIKIPEDIE</span><div class="language-switch"><button class="lang-choice${language === 'cs' ? ' active' : ''}" data-lang="cs">ČEŠTINA</button><button class="lang-choice${language === 'en' ? ' active' : ''}" data-lang="en">ENGLISH</button></div></div>
             <button class="mode-button mode-button-secondary" id="save-room-route"><span>${startTitle ? 'ULOŽIT ZMĚNY TRASY' : 'ULOŽIT TRASU'}</span></button>
             <p class="form-error" id="multiplayer-error" aria-live="polite"></p>
           </div>` : `<div class="room-route"><span>TRASA</span><strong>${escapeHtml(startTitle || 'Hostitel nastavuje trasu')}${targetTitle ? ` — ${escapeHtml(targetTitle)}` : ''}</strong><small>${language === 'cs' ? 'ČEŠTINA' : 'ANGLIČTINA'}</small></div>`}
-          <div class="room-players-heading"><span class="card-label">HRÁČI</span><span class="room-player-count">${players.length} / 6</span></div>
+          <div class="room-players-heading"><span class="card-label">HRÁČI</span><span class="room-player-count">${players.length} / ${ROOM_MAX_PLAYERS}</span></div>
           <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === roomHostId ? ' · HOSTITEL' : ''}</span><span class="player-state">${roomStarted && raceWinner ? (player.inLobby ? 'V LOBBY' : 'VÝSLEDEK') : player.ready ? 'PŘIPRAVEN/A' : 'ČEKÁ'}</span>${isRoomHost && player.id !== currentPeer?.id ? `<button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
           <p class="room-status" id="room-status">${waitingForReturns ? 'Počkej, až se všichni vrátí z výsledku.' : isRoomHost ? (!startTitle ? 'Nastav trasu a pozvi další hráče.' : players.length < 2 ? 'Čekám na další hráče…' : guestsReady ? 'Všichni jsou připraveni.' : 'Čekám, až se hráči připraví…') : roomStarted ? 'Do lobby ses vrátil/a. Čekám na ostatní…' : localIsReady ? 'Jsi připraven/a. Čekám na start hostitele.' : 'Až budeš připraven/a, klikni na tlačítko níže.'}</p>
           ${isRoomHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 || !startTitle || !targetTitle || !guestsReady || roomStarted ? 'disabled' : ''}><span>START</span></button>` : `<button class="start-button mode-button" id="toggle-ready" ${waitingForReturns ? 'disabled' : ''}><span>${localIsReady ? 'ZRUŠIT PŘIPRAVENOST' : 'PŘIPRAVIT'}</span></button>`}
@@ -353,6 +368,9 @@ function renderRoomLobby() {
   app.querySelector('#start-multiplayer')?.addEventListener('click', startMultiplayerRace);
   app.querySelector('#toggle-ready')?.addEventListener('click', toggleReady);
   app.querySelector('#save-room-route')?.addEventListener('click', submitRoomRoute);
+  app.querySelector('#random-route')?.addEventListener('click', () => { void chooseRandomRoute(); });
+  app.querySelector<HTMLInputElement>('#room-start-input')?.addEventListener('input', (event) => { roomStartDraft = (event.currentTarget as HTMLInputElement).value; });
+  app.querySelector<HTMLInputElement>('#room-target-input')?.addEventListener('input', (event) => { roomTargetDraft = (event.currentTarget as HTMLInputElement).value; });
   app.querySelectorAll<HTMLButtonElement>('.lang-choice').forEach((button) => button.addEventListener('click', () => {
     language = button.dataset.lang ?? 'cs';
     app.querySelectorAll('.lang-choice').forEach((choice) => choice.classList.toggle('active', choice === button));
@@ -367,12 +385,47 @@ function submitRoomRoute() {
   if (start.toLocaleLowerCase() === target.toLocaleLowerCase()) { showMultiplayerError('Start a cíl musí být dva různé články.'); return; }
   startTitle = start;
   targetTitle = target;
+  roomStartDraft = start;
+  roomTargetDraft = target;
   route = [start];
   multiplayerPlayers.forEach((player, id) => multiplayerPlayers.set(id, {
     ...player, clicks: 0, article: start, finished: false, elapsedSeconds: 0, ready: false,
   }));
   renderRoomLobby();
   broadcastRoomSnapshot();
+}
+
+async function chooseRandomRoute(startSelector = '#room-start-input', targetSelector = '#room-target-input', buttonSelector = '#random-route') {
+  const button = app.querySelector<HTMLButtonElement>(buttonSelector);
+  const titles = language === 'en' ? randomArticles.en : randomArticles.cs;
+  if (!button) return;
+  button.disabled = true;
+  try {
+    const endpoint = `https://${language}.wikipedia.org/w/api.php?action=query&list=random&rnnamespace=0&rnlimit=2&format=json&origin=*`;
+    const response = await fetch(endpoint);
+    if (!response.ok) throw new Error('Wikipedie teď neodpovídá.');
+    const data = await response.json() as { query?: { random?: Array<{ title: string }> } };
+    const randomTitles = data.query?.random?.map((article) => article.title) ?? [];
+    if (randomTitles.length < 2) throw new Error('Články se nepodařilo náhodně vybrat.');
+    setRouteDraft(randomTitles[0], randomTitles[1], startSelector, targetSelector);
+  } catch {
+    const firstIndex = Math.floor(Math.random() * titles.length);
+    let secondIndex = Math.floor(Math.random() * (titles.length - 1));
+    if (secondIndex >= firstIndex) secondIndex += 1;
+    setRouteDraft(titles[firstIndex], titles[secondIndex], startSelector, targetSelector);
+    showMultiplayerError('Náhodné články vybrány z nabídky.');
+  } finally {
+    if (button.isConnected) button.disabled = false;
+  }
+}
+
+function setRouteDraft(start: string, target: string, startSelector = '#room-start-input', targetSelector = '#room-target-input') {
+  if (startSelector === '#room-start-input') roomStartDraft = start;
+  if (targetSelector === '#room-target-input') roomTargetDraft = target;
+  const startInput = app.querySelector<HTMLInputElement>(startSelector);
+  const targetInput = app.querySelector<HTMLInputElement>(targetSelector);
+  if (startInput) startInput.value = start;
+  if (targetInput) targetInput.value = target;
 }
 
 function kickRoomPlayer(playerId: string) {
@@ -479,7 +532,8 @@ function returnPlayerToLobby() {
 
 function syncLobbyReturns() {
   if (!isRoomHost) return;
-  if (multiplayerPlayers.size && [...multiplayerPlayers.values()].every((player) => player.inLobby)) {
+  const allPlayersReturned = multiplayerPlayers.size > 0 && [...multiplayerPlayers.values()].every((player) => player.inLobby);
+  if (allPlayersReturned) {
     if (timerId) window.clearInterval(timerId);
     roomStarted = false;
     raceWinner = '';
@@ -492,7 +546,7 @@ function syncLobbyReturns() {
     }));
   }
   broadcastRoomSnapshot();
-  renderRoomLobby();
+  if (allPlayersReturned || multiplayerPlayers.get(roomHostId)?.inLobby) renderRoomLobby();
 }
 
 function renderRouteSetup() {
@@ -503,6 +557,7 @@ function renderRouteSetup() {
         <div class="hero-copy"><p class="eyebrow"><span>01</span> WIKIPEDIE, ALE JAKO ZÁVOD</p><h1>Jak rychle<br>najdeš <em>cestu?</em></h1><p class="intro">Začni na jednom článku. Skonči na druhém. Mezitím se můžeš pohybovat jen po odkazech.</p></div>
         <div class="route-card">
           <div class="card-top"><span class="card-label">NASTAV SI TRASU</span><span class="route-icon">01</span></div>
+          <button class="mode-button mode-button-secondary random-route-button" id="random-solo-route"><span>VYBRAT NÁHODNOU TRASU</span></button>
           <label class="field-label" for="start-input">STARTOVNÍ ČLÁNEK</label>
           <div class="input-wrap"><span class="field-symbol">◉</span><input id="start-input" autocomplete="off" placeholder="např. Praha" required aria-required="true"></div>
           <div class="route-connector"><span></span><small>TVÁ CESTA</small><span></span></div>
@@ -519,6 +574,7 @@ function renderRouteSetup() {
     </main>`;
   const startInput = app.querySelector<HTMLInputElement>('#start-input')!;
   const targetInput = app.querySelector<HTMLInputElement>('#target-input')!;
+  app.querySelector('#random-solo-route')!.addEventListener('click', () => { void chooseRandomRoute('#start-input', '#target-input', '#random-solo-route'); });
   app.querySelector('#back-to-modes')!.addEventListener('click', renderWelcome);
   app.querySelectorAll<HTMLButtonElement>('.lang-choice').forEach((button) => button.addEventListener('click', () => {
     language = button.dataset.lang ?? 'cs';
@@ -671,6 +727,8 @@ function goHome() {
   roomStartsAt = 0;
   raceWinner = '';
   raceWinnerTime = 0;
+  roomStartDraft = null;
+  roomTargetDraft = null;
   startTitle = '';
   targetTitle = '';
   currentTitle = '';
@@ -680,4 +738,31 @@ function goHome() {
   renderWelcome();
 }
 
+function initializeTheme() {
+  try {
+    const savedTheme = localStorage.getItem('wiki-sprint-theme');
+    if (savedTheme === 'dark' || savedTheme === 'light') selectedTheme = savedTheme;
+  } catch {
+    selectedTheme = 'light';
+  }
+  const toggle = document.createElement('button');
+  toggle.className = 'theme-toggle';
+  toggle.type = 'button';
+  toggle.addEventListener('click', () => {
+    selectedTheme = selectedTheme === 'light' ? 'dark' : 'light';
+    applyTheme(toggle);
+    try { localStorage.setItem('wiki-sprint-theme', selectedTheme); } catch { /* Theme still works until this page closes. */ }
+  });
+  document.body.append(toggle);
+  applyTheme(toggle);
+}
+
+function applyTheme(toggle: HTMLButtonElement) {
+  document.body.classList.toggle('theme-light', selectedTheme === 'light');
+  document.documentElement.style.colorScheme = selectedTheme;
+  toggle.textContent = selectedTheme === 'light' ? 'TMAVÝ REŽIM' : 'SVĚTLÝ REŽIM';
+  toggle.setAttribute('aria-label', selectedTheme === 'light' ? 'Zapnout tmavý režim' : 'Zapnout světlý režim');
+}
+
+initializeTheme();
 renderWelcome();
