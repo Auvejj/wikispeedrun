@@ -392,7 +392,7 @@ function renderRoomLobby() {
     if (!navigator.clipboard) { showMultiplayerError(`Kód místnosti: ${roomCode}`); return; }
     void navigator.clipboard.writeText(roomCode).then(() => showMultiplayerError('Kód místnosti zkopírován.')).catch(() => showMultiplayerError(`Kód místnosti: ${roomCode}`));
   });
-  app.querySelector('#start-multiplayer')?.addEventListener('click', startMultiplayerRace);
+  app.querySelector('#start-multiplayer')?.addEventListener('click', () => startMultiplayerRace());
   app.querySelector('#toggle-ready')?.addEventListener('click', toggleReady);
   app.querySelector('#random-route')?.addEventListener('click', () => { void chooseRandomRoute(); });
   app.querySelector<HTMLInputElement>('#room-start-input')?.addEventListener('input', (event) => { roomStartDraft = (event.currentTarget as HTMLInputElement).value; });
