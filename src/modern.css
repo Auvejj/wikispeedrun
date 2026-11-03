@@ -184,8 +184,12 @@ input:focus-visible {
 }
 
 .room-shell .room-hero.setup-hero-centered {
-  grid-template-columns: minmax(0, 620px);
+  grid-template-columns: minmax(260px, 1fr) minmax(390px, 480px);
   justify-content: center;
+  align-items: start;
+  max-width: 1040px;
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .room-card {
@@ -264,11 +268,12 @@ input:focus-visible {
 }
 
 .leaderboard {
-  margin-top: 6px;
-  padding: 12px;
+  margin: 0;
+  padding: 22px;
   border: 1px solid rgba(194, 251, 98, 0.16);
-  border-radius: 9px;
-  background: rgba(194, 251, 98, 0.035);
+  border-radius: 17px;
+  background: linear-gradient(145deg, rgba(31, 40, 35, 0.96), rgba(23, 30, 27, 0.96));
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.2), inset 0 1px rgba(255, 255, 255, 0.035);
 }
 
 .leaderboard-heading {
@@ -955,6 +960,10 @@ input:focus-visible {
   }
 
   .room-shell .room-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .room-shell .room-hero.setup-hero-centered {
     grid-template-columns: 1fr;
   }
 
