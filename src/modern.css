@@ -946,20 +946,18 @@ input:focus-visible {
 }
 
 .theme-toggle {
-  position: fixed;
-  z-index: 10;
-  right: 18px;
-  bottom: 16px;
-  min-height: 36px;
-  padding: 0 12px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  padding: 0 14px;
   border: 1px solid rgba(125, 139, 126, 0.35);
   border-radius: 8px;
-  background: rgba(248, 249, 244, 0.92);
-  color: #344034;
-  font: 8px var(--mono);
-  letter-spacing: 0.07em;
-  box-shadow: 0 5px 20px rgba(20, 30, 20, 0.12);
-  backdrop-filter: blur(8px);
+  background: transparent;
+  color: var(--muted);
+  font: 9px var(--mono);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
 }
 
 .theme-toggle:hover {
@@ -968,7 +966,7 @@ input:focus-visible {
 
 body:not(.theme-light) .theme-toggle {
   border-color: rgba(222, 235, 223, 0.2);
-  background: rgba(24, 32, 27, 0.92);
+  background: rgba(24, 32, 27, 0.35);
   color: #eaf0e7;
 }
 

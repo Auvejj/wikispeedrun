@@ -71,6 +71,7 @@ function renderWelcome() {
           <div class="card-top"><span class="card-label">JAK CHCEŠ HRÁT?</span><span class="route-icon">01</span></div>
           <div class="mode-heading"><span class="card-label">JAK CHCEŠ HRÁT?</span></div>
           <div class="mode-buttons"><button class="start-button mode-button" id="single-mode"><span>SINGLEPLAYER</span></button><button class="mode-button mode-button-secondary" id="multi-mode"><span>MULTIPLAYER</span></button></div>
+          <button class="theme-toggle" id="theme-toggle" type="button"></button>
         </div>
       </section>
       <section class="how-row"><div><span class="how-num">01</span><strong>Vyber režim</strong><small>Sólo nebo závod s ostatními.</small></div><div><span class="how-num">02</span><strong>Nastav trasu</strong><small>Vyber start a cílový článek.</small></div><div><span class="how-num">03</span><strong>Proklikej se</strong><small>Každý odkaz tě posune dál.</small></div></section>
@@ -79,6 +80,19 @@ function renderWelcome() {
 
   app.querySelector('#single-mode')!.addEventListener('click', () => { playerName = ''; renderRouteSetup(); });
   app.querySelector('#multi-mode')!.addEventListener('click', renderMultiplayerIntro);
+  const themeToggle = app.querySelector<HTMLButtonElement>('#theme-toggle')!;
+  updateThemeToggle(themeToggle);
+  themeToggle.addEventListener('click', () => {
+    selectedTheme = selectedTheme === 'light' ? 'dark' : 'light';
+    applyTheme();
+    updateThemeToggle(themeToggle);
+    try { localStorage.setItem('wiki-sprint-theme', selectedTheme); } catch { /* Theme still works until this page closes. */ }
+  });
+}
+
+function updateThemeToggle(toggle: HTMLButtonElement) {
+  toggle.textContent = selectedTheme === 'light' ? 'PŘEPNOUT NA TMAVÝ REŽIM' : 'PŘEPNOUT NA SVĚTLÝ REŽIM';
+  toggle.setAttribute('aria-label', selectedTheme === 'light' ? 'Zapnout tmavý režim' : 'Zapnout světlý režim');
 }
 
 function renderMultiplayerIntro() {
@@ -745,23 +759,12 @@ function initializeTheme() {
   } catch {
     selectedTheme = 'light';
   }
-  const toggle = document.createElement('button');
-  toggle.className = 'theme-toggle';
-  toggle.type = 'button';
-  toggle.addEventListener('click', () => {
-    selectedTheme = selectedTheme === 'light' ? 'dark' : 'light';
-    applyTheme(toggle);
-    try { localStorage.setItem('wiki-sprint-theme', selectedTheme); } catch { /* Theme still works until this page closes. */ }
-  });
-  document.body.append(toggle);
-  applyTheme(toggle);
+  applyTheme();
 }
 
-function applyTheme(toggle: HTMLButtonElement) {
+function applyTheme() {
   document.body.classList.toggle('theme-light', selectedTheme === 'light');
   document.documentElement.style.colorScheme = selectedTheme;
-  toggle.textContent = selectedTheme === 'light' ? 'TMAVÝ REŽIM' : 'SVĚTLÝ REŽIM';
-  toggle.setAttribute('aria-label', selectedTheme === 'light' ? 'Zapnout tmavý režim' : 'Zapnout světlý režim');
 }
 
 initializeTheme();
