@@ -263,6 +263,80 @@ input:focus-visible {
   padding-right: 3px;
 }
 
+.leaderboard {
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid rgba(194, 251, 98, 0.16);
+  border-radius: 9px;
+  background: rgba(194, 251, 98, 0.035);
+}
+
+.leaderboard-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.leaderboard-sort {
+  color: var(--muted);
+  font: 7px var(--mono);
+  letter-spacing: 0.06em;
+}
+
+.leaderboard-list {
+  display: grid;
+  gap: 5px;
+  max-height: 190px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leaderboard-list li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.leaderboard-rank {
+  width: 24px;
+  color: var(--green);
+  font: 9px var(--mono);
+}
+
+.leaderboard-name {
+  flex: 1;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-score {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font: 9px var(--mono);
+}
+
+.leaderboard-score b {
+  color: var(--green);
+}
+
+.leaderboard-score small {
+  min-width: 52px;
+  color: var(--muted);
+  text-align: right;
+}
+
 .room-player-list li {
   display: flex;
   align-items: center;

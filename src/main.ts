@@ -3,7 +3,7 @@ import './modern.css';
 import { Peer, type DataConnection } from 'peerjs';
 
 type WikiArticle = { title: string; html: string; url: string };
-type MultiplayerPlayer = { id: string; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number; inLobby: boolean; ready: boolean };
+type MultiplayerPlayer = { id: string; name: string; clicks: number; wins: number; totalClicks: number; article: string; finished: boolean; elapsedSeconds: number; inLobby: boolean; ready: boolean };
 type RoomPacket =
   | { type: 'join'; name: string }
   | { type: 'transfer-host'; playerId: string }
@@ -13,7 +13,7 @@ type RoomPacket =
   | { type: 'start'; startTitle: string; targetTitle: string; language: string; countdownMs: number }
   | { type: 'progress'; name: string; clicks: number; article: string; finished: boolean; elapsedSeconds: number }
   | { type: 'ready'; ready: boolean }
-  | { type: 'finish'; winnerName: string; elapsedSeconds: number }
+  | { type: 'finish'; winnerId: string; winnerName: string; elapsedSeconds: number; winnerWins: number; winnerTotalClicks: number; winnerClicks: number }
   | { type: 'return-lobby' }
   | { type: 'kicked'; message: string }
   | { type: 'error'; message: string };
@@ -194,7 +194,7 @@ function createRoom() {
   setupPeerEvents(peer);
   peer.on('open', (id) => {
     roomHostId = id;
-    multiplayerPlayers.set(id, { id, name: playerName, clicks: 0, article: '', finished: false, elapsedSeconds: 0, inLobby: true, ready: false });
+    multiplayerPlayers.set(id, { id, name: playerName, clicks: 0, wins: 0, totalClicks: 0, article: '', finished: false, elapsedSeconds: 0, inLobby: true, ready: false });
     peer.on('connection', (connection) => acceptRoomConnection(connection));
     renderRoomLobby();
   });
@@ -210,7 +210,7 @@ function acceptRoomConnection(connection: DataConnection) {
         connection.close();
         return;
       }
-      multiplayerPlayers.set(connection.peer, { id: connection.peer, name: packet.name.slice(0, 20), clicks: 0, article: startTitle, finished: false, elapsedSeconds: 0, inLobby: true, ready: false });
+      multiplayerPlayers.set(connection.peer, { id: connection.peer, name: packet.name.slice(0, 20), clicks: 0, wins: 0, totalClicks: 0, article: startTitle, finished: false, elapsedSeconds: 0, inLobby: true, ready: false });
       sendRoomSnapshot(connection);
       broadcastRoomSnapshot();
       renderRoomLobby();
@@ -229,7 +229,7 @@ function acceptRoomConnection(connection: DataConnection) {
       const finished = packet.finished && packet.article.toLocaleLowerCase() === targetTitle.toLocaleLowerCase();
       multiplayerPlayers.set(connection.peer, { ...existing, clicks: packet.clicks, article: packet.article, finished, elapsedSeconds: packet.elapsedSeconds });
       if (finished) {
-        finishMultiplayerRace(existing.name, packet.elapsedSeconds);
+        finishMultiplayerRace(connection.peer, packet.elapsedSeconds);
         return;
       }
       broadcastRoomSnapshot();
@@ -279,7 +279,7 @@ function joinRoom(codeInput: string) {
     hostConnection = connection;
     connection.on('open', () => {
       connection.send({ type: 'join', name: playerName });
-      multiplayerPlayers.set(peer.id, { id: peer.id, name: playerName, clicks: 0, article: '', finished: false, elapsedSeconds: 0, inLobby: true, ready: false });
+      multiplayerPlayers.set(peer.id, { id: peer.id, name: playerName, clicks: 0, wins: 0, totalClicks: 0, article: '', finished: false, elapsedSeconds: 0, inLobby: true, ready: false });
       renderRoomLobby();
     });
     connection.on('data', (data) => handleRoomPacket(data as RoomPacket));
@@ -322,6 +322,8 @@ function handleRoomPacket(packet: RoomPacket) {
   if (packet.type === 'finish') {
     raceWinner = packet.winnerName;
     raceWinnerTime = packet.elapsedSeconds;
+    const winner = multiplayerPlayers.get(packet.winnerId);
+    if (winner) multiplayerPlayers.set(packet.winnerId, { ...winner, wins: packet.winnerWins, totalClicks: packet.winnerTotalClicks, clicks: packet.winnerClicks });
     if (timerId) window.clearInterval(timerId);
     showMultiplayerWinner();
     return;
@@ -358,6 +360,7 @@ function renderRoomLobby() {
   const localIsHost = isLocalRoomHost();
   const isConnected = isRoomHost || hostConnection?.open === true;
   const players = [...multiplayerPlayers.values()];
+  const leaderboard = [...players].sort((a, b) => b.wins - a.wins || a.totalClicks - b.totalClicks || a.name.localeCompare(b.name));
   const startDraft = roomStartDraft ?? startTitle;
   const targetDraft = roomTargetDraft ?? targetTitle;
   const guestsReady = players.filter((player) => player.id !== roomHostId).every((player) => player.ready);
@@ -381,6 +384,7 @@ function renderRoomLobby() {
           </div>` : `<div class="room-route"><span>TRASA</span><strong>${escapeHtml(startTitle || 'Hostitel nastavuje trasu')}${targetTitle ? ` — ${escapeHtml(targetTitle)}` : ''}</strong><small>${language === 'cs' ? 'ČEŠTINA' : 'ANGLIČTINA'}</small></div>`}
           <div class="room-players-heading"><span class="card-label">HRÁČI</span><span class="room-player-count">${players.length} / ${ROOM_MAX_PLAYERS}</span></div>
           <ul class="room-player-list" id="room-player-list">${players.map((player) => `<li><span class="player-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span><span class="player-name">${escapeHtml(player.name)}${player.id === currentPeer?.id ? ' (ty)' : ''}${player.id === roomHostId ? ' · HOSTITEL' : ''}</span><span class="player-state">${roomStarted && raceWinner ? (player.inLobby ? 'V LOBBY' : 'VÝSLEDEK') : player.ready ? 'PŘIPRAVEN/A' : 'ČEKÁ'}</span>${localIsHost && player.id !== currentPeer?.id ? `<button class="transfer-host" data-transfer="${escapeHtml(player.id)}" aria-label="Předat hostitelství hráči ${escapeHtml(player.name)}">PŘEDAT HOSTA</button><button class="kick-player" data-kick="${escapeHtml(player.id)}" aria-label="Vyhodit hráče ${escapeHtml(player.name)}">VYHODIT</button>` : ''}</li>`).join('')}</ul>
+          <section class="leaderboard" aria-label="Žebříček multiplayer místnosti"><div class="leaderboard-heading"><span class="card-label">ŽEBŘÍČEK</span><span class="leaderboard-sort">VÝHRY · KLIKY</span></div><ol class="leaderboard-list">${leaderboard.map((player, index) => `<li><span class="leaderboard-rank">${String(index + 1).padStart(2, '0')}</span><span class="leaderboard-name">${escapeHtml(player.name)}</span><span class="leaderboard-score"><b>${player.wins}</b><small>${player.totalClicks} kliků</small></span></li>`).join('')}</ol></section>
           <p class="room-status" id="room-status">${waitingForReturns ? 'Počkej, až se všichni vrátí z výsledku.' : localIsHost ? (!startTitle ? 'Nastav trasu a pozvi další hráče.' : players.length < 2 ? 'Čekám na další hráče…' : guestsReady ? 'Všichni jsou připraveni.' : 'Čekám, až se hráči připraví…') : roomStarted ? 'Do lobby ses vrátil/a. Čekám na ostatní…' : localIsReady ? 'Jsi připraven/a. Čekám na start hostitele.' : 'Až budeš připraven/a, klikni na tlačítko níže.'}</p>
           ${localIsHost ? `<button class="start-button mode-button" id="start-multiplayer" ${players.length < 2 || !guestsReady || roomStarted ? 'disabled' : ''}><span>START</span></button>` : `<button class="start-button mode-button" id="toggle-ready" ${waitingForReturns ? 'disabled' : ''}><span>${localIsReady ? 'ZRUŠIT PŘIPRAVENOST' : 'PŘIPRAVIT'}</span></button>`}
         </div>
@@ -501,10 +505,13 @@ function beginMultiplayerGame() {
 
 function reportMultiplayerProgress(article: string) {
   if (!isMultiplayer || !currentPeer || raceWinner) return;
+  const previousScore = multiplayerPlayers.get(currentPeer.id);
   const player: MultiplayerPlayer = {
     id: currentPeer.id,
     name: playerName,
     clicks,
+    wins: previousScore?.wins ?? 0,
+    totalClicks: previousScore?.totalClicks ?? 0,
     article,
     finished: article.toLocaleLowerCase() === targetTitle.toLocaleLowerCase(),
     elapsedSeconds: Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
@@ -514,7 +521,7 @@ function reportMultiplayerProgress(article: string) {
   if (isRoomHost) {
     multiplayerPlayers.set(player.id, player);
     if (player.finished) {
-      finishMultiplayerRace(playerName, player.elapsedSeconds);
+      finishMultiplayerRace(player.id, player.elapsedSeconds);
       return;
     }
     broadcastRoomSnapshot();
@@ -533,11 +540,16 @@ function toggleReady() {
   renderRoomLobby();
 }
 
-function finishMultiplayerRace(winnerName: string, elapsedSeconds: number) {
+function finishMultiplayerRace(winnerId: string, elapsedSeconds: number) {
   if (!isRoomHost || raceWinner) return;
-  raceWinner = winnerName;
+  const winner = multiplayerPlayers.get(winnerId);
+  if (!winner) return;
+  const winnerClicks = winner.clicks;
+  const updatedWinner = { ...winner, wins: winner.wins + 1, totalClicks: winner.totalClicks + winnerClicks };
+  multiplayerPlayers.set(winnerId, updatedWinner);
+  raceWinner = winner.name;
   raceWinnerTime = elapsedSeconds;
-  const packet: RoomPacket = { type: 'finish', winnerName, elapsedSeconds };
+  const packet: RoomPacket = { type: 'finish', winnerId, winnerName: winner.name, elapsedSeconds, winnerWins: updatedWinner.wins, winnerTotalClicks: updatedWinner.totalClicks, winnerClicks };
   roomConnections.forEach((connection) => { if (connection.open) connection.send(packet); });
   if (timerId) window.clearInterval(timerId);
   showMultiplayerWinner();
